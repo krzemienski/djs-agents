@@ -129,7 +129,7 @@ def search_jobs(query, model="gpt-4o", max_tokens=4000):
     Args:
         query: Search query or instructions
         model: Model to use for the search
-        max_tokens: Maximum tokens to generate
+        max_tokens: Maximum tokens to generate (NOTE: not used directly in API call due to version differences)
 
     Returns:
         List of job dictionaries
@@ -141,8 +141,8 @@ def search_jobs(query, model="gpt-4o", max_tokens=4000):
         response = client.responses.create(
             model=model,
             input=query,
-            tools=[{"type": "web_search"}],
-            max_tokens=max_tokens
+            tools=[{"type": "web_search"}]
+            # max_tokens parameter omitted for compatibility with different API versions
         )
 
     # Extract the response text

@@ -1,0 +1,982 @@
+2025-05-13 20:18:23 [INFO] jobbot.setup_enhanced_logger:283 - [34mLogging to file: /app/logs/jobsearch_20250513_161821.log[0m
+2025-05-13 20:18:23 [INFO] jobbot.setup_enhanced_logger:299 - [34mAPI logging to file: /app/logs/jobsearch_20250513_161821.api.log[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.setup_enhanced_logger:302 - [37mEnhanced logger initialized[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.setup_logger:100 - [37mLogger initialized with level: DEBUG[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.setup_logger:101 - [37mPython version: 3.11.12 (main, May 10 2025, 04:25:49) [GCC 12.2.0][0m
+2025-05-13 20:18:23 [INFO] jobbot.main:1163 - [34mdeep_job_search starting with Python 3.11.12 (main, May 10 2025, 04:25:49) [GCC 12.2.0][0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:386 - [37mToken estimate breakdown:[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:387 - [37m  - Planning (gpt-4.1): 5,000 tokens ($0.0500)[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:388 - [37m  - Search/Process (gpt-4o-mini): 45,000 tokens ($0.0900)[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:389 - [37m  - Verification (o3): 6,000 tokens ($0.0030)[0m
+2025-05-13 20:18:23 [INFO] jobbot.main:1187 - [34mEstimated resource usage:[0m
+2025-05-13 20:18:23 [INFO] jobbot.main:1188 - [34m  - Tokens: ~56,000 tokens[0m
+2025-05-13 20:18:23 [INFO] jobbot.main:1189 - [34m  - Cost: ~$0.1430[0m
+2025-05-13 20:18:23 [INFO] jobbot.main:1221 - [34mJob search execution started[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:534 - [34mJob search started with configuration: {
+  "majors": 10,
+  "startups": 10,
+  "planner_model": "gpt-4.1",
+  "search_model": "gpt-4o-mini",
+  "verifier_model": "o3",
+  "log_level": "DEBUG",
+  "log_file": "/app/logs/jobsearch_20250513_161821.log",
+  "max_tokens": 100000,
+  "force": false,
+  "budget": null,
+  "sample": true,
+  "use_web_verify": false,
+  "trace": false
+}[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:386 - [37mToken estimate breakdown:[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:387 - [37m  - Planning (gpt-4.1): 5,000 tokens ($0.0500)[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:388 - [37m  - Search/Process (gpt-4o-mini): 45,000 tokens ($0.0900)[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.estimate_cost:389 - [37m  - Verification (o3): 6,000 tokens ($0.0030)[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:540 - [34mEstimated resource usage:[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:541 - [34m  - Tokens: ~56,000 tokens[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:542 - [34m  - Cost: ~$0.1430[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m▶ STARTED: Agent Initialization[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:568 - [34m  Initializing Planner agent with model: gpt-4.1[0m
+2025-05-13 20:18:23 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'planner' with model: gpt-4.1[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: planner[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: planner in 0.00s[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:576 - [34m  Initializing Processor agent with model: gpt-4o-mini[0m
+2025-05-13 20:18:23 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'processor' with model: gpt-4o-mini[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: processor[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: processor in 0.00s[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:584 - [34m  Initializing Verifier agent with model: o3[0m
+2025-05-13 20:18:23 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'verifier' with model: o3[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: verifier[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: verifier in 0.00s[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:605 - [34m  Initializing Searcher agent with model: gpt-4o-mini[0m
+2025-05-13 20:18:23 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'searcher' with model: gpt-4o-mini[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.create_agent:61 - [37m  Agent tools: WebSearchTool(user_location=None, search_context_size='medium'), FunctionTool(name='extract_job_listings', description='Extract job listings from search results text', params_json_schema={'properties': {'search_results': {'description': 'Raw text from web search results', 'title': 'Search Results', 'type': 'string'}}, 'required': ['search_results'], 'title': 'extract_job_listings_args', 'type': 'object', 'additionalProperties': False}, on_invoke_tool=<function function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool at 0xffff522ee7a0>, strict_json_schema=True)[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: searcher[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: searcher in 0.00s[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__exit__:326 - [37m✓ COMPLETED: Agent Initialization in 0.00s[0m
+2025-05-13 20:18:23 [INFO] jobbot.__enter__:318 - [34m▶ STARTED: Planning Phase[0m
+2025-05-13 20:18:23 [INFO] jobbot.gather:622 - [34m  Generating job search plan...[0m
+2025-05-13 20:18:23 [INFO] jobbot.run_agent:87 - [34m  Running agent 'planner'[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.run_agent:88 - [37m  Generate a comprehensive job search plan covering both major companies and startups[0m
+2025-05-13 20:18:23 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Run: planner[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.run_agent:100 - [37m    Agent completed in 14.53s[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.run_agent:105 - [37m    Agent output: [
+  {"company": "Amazon", "keyword": "cloud"},
+  {"company": "Amazon", "keyword": "backend"},
+  {"company": "Amazon", "keyword": "infrastructure"},
+  {"company": "Apple", "keyword": "media"},
+  {"company": "Apple", "keyword": "video"},
+  {"company": "Apple", "keyword": "encoding"},
+  {"company": "Google", "keyword": "streaming"},
+  {"company": "Google", "keyword": "cloud"},
+  {"company": "Google", "keyword": "kubernetes"},
+  {"company": "Meta", "keyword": "video"},
+  {"company": "Meta", "keyword...[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Run: planner in 14.53s[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'plan' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:478 - [34m  Phase 'plan' token usage: 0 tokens[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:480 - [34m  Phase 'plan' API calls: 1[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:483 - [34m  Current token usage by model:[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:514 - [34m  Token usage details not available from API[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:520 - [34m  Total usage: 0/100,000 tokens (0.0%, $0.0000)[0m
+2025-05-13 20:18:38 [INFO] jobbot.log_usage:526 - [34m  Total API calls: 1[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.log_usage:529 - [37m    - plan: 1 calls[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.gather:636 - [37m  Raw plan output: [
+  {"company": "Amazon", "keyword": "cloud"},
+  {"company": "Amazon", "keyword": "backend"},
+  {"company": "Amazon", "keyword": "infrastructure"},
+  {"company": "Apple", "keyword": "media"},
+  {"company": "Apple", "keyword": "video"},
+  {"company": "Apple", "keyword": "encoding"},
+  {"company": "Google", "keyword": "streaming"},
+  {"company": "Google", "keyword": "cloud"},
+  {"company": "Google", "keyword": "kubernetes"},
+  {"company": "Meta", "keyword": "video"},
+  {"company": "Meta", "keyword": "backend"},
+  {"company": "Meta", "keyword": "lead"},
+  {"company": "Microsoft", "keyword": "cloud"},
+  {"company": "Microsoft", "keyword": "infrastructure"},
+  {"company": "Microsoft", "keyword": "principal"},
+  {"company": "Netflix", "keyword": "streaming"},
+  {"company": "Netflix", "keyword": "media"},
+  {"company": "Netflix", "keyword": "encoding"},
+  {"company": "NVIDIA", "keyword": "video"},
+  {"company": "NVIDIA", "keyword": "encoding"},
+  {"company": "NVIDIA", "keyword": "infrastructure"},
+  {"company": "OpenAI", "keyword": "cloud"},
+  {"company": "OpenAI", "keyword": "backend"},
+  {"company": "OpenAI", "keyword": "principal"},
+  {"company": "Anthropic", "keyword": "cloud"},
+  {"company": "Anthropic", "keyword": "infrastructure"},
+  {"company": "Anthropic", "keyword": "lead"},
+  {"company": "Disney", "keyword": "media"},
+  {"company": "Disney", "keyword": "streaming"},
+  {"company": "Disney", "keyword": "video"},
+  {"company": "Hulu", "keyword": "streaming"},
+  {"company": "Hulu", "keyword": "media"},
+  {"company": "Hulu", "keyword": "backend"},
+  {"company": "TikTok", "keyword": "video"},
+  {"company": "TikTok", "keyword": "media"},
+  {"company": "TikTok", "keyword": "cloud"},
+  {"company": "Snap", "keyword": "video"},
+  {"company": "Snap", "keyword": "backend"},
+  {"company": "Snap", "keyword": "infrastructure"},
+  {"company": "Zoom", "keyword": "video"},
+  {"company": "Zoom", "keyword": "cloud"},
+  {"company": "Zoom", "keyword": "kubernetes"},
+  {"company": "Cisco", "keyword": "cloud"},
+  {"company": "Cisco", "keyword": "infrastructure"},
+  {"company": "Cisco", "keyword": "backend"},
+  {"company": "Comcast", "keyword": "media"},
+  {"company": "Comcast", "keyword": "streaming"},
+  {"company": "Comcast", "keyword": "infrastructure"},
+  {"company": "Warner Bros. Discovery", "keyword": "media"},
+  {"company": "Warner Bros. Discovery", "keyword": "streaming"},
+  {"company": "Warner Bros. Discovery", "keyword": "video"},
+  {"company": "Paramount", "keyword": "media"},
+  {"company": "Paramount", "keyword": "streaming"},
+  {"company": "Paramount", "keyword": "backend"},
+  {"company": "IBM", "keyword": "cloud"},
+  {"company": "IBM", "keyword": "kubernetes"},
+  {"company": "IBM", "keyword": "infrastructure"},
+  {"company": "Valve", "keyword": "media"},
+  {"company": "Valve", "keyword": "video"},
+  {"company": "Valve", "keyword": "backend"},
+  {"company": "Livepeer", "keyword": "video"},
+  {"company": "Livepeer", "keyword": "streaming"},
+  {"company": "Livepeer", "keyword": "encoding"},
+  {"company": "Twelve Labs", "keyword": "video"},
+  {"company": "Twelve Labs", "keyword": "media"},
+  {"company": "Twelve Labs", "keyword": "cloud"},
+  {"company": "Tapcart", "keyword": "backend"},
+  {"company": "Tapcart", "keyword": "cloud"},
+  {"company": "Tapcart", "keyword": "infrastructure"},
+  {"company": "Mux", "keyword": "video"},
+  {"company": "Mux", "keyword": "streaming"},
+  {"company": "Mux", "keyword": "encoding"},
+  {"company": "Apporto", "keyword": "cloud"},
+  {"company": "Apporto", "keyword": "backend"},
+  {"company": "Apporto", "keyword": "infrastructure"},
+  {"company": "GreyNoise", "keyword": "cloud"},
+  {"company": "GreyNoise", "keyword": "backend"},
+  {"company": "GreyNoise", "keyword": "infrastructure"},
+  {"company": "Daily.co", "keyword": "video"},
+  {"company": "Daily.co", "keyword": "streaming"},
+  {"company": "Daily.co", "keyword": "cloud"},
+  {"company": "Temporal Technologies", "keyword": "backend"},
+  {"company": "Temporal Technologies", "keyword": "cloud"},
+  {"company": "Temporal Technologies", "keyword": "infrastructure"},
+  {"company": "Bitmovin", "keyword": "video"},
+  {"company": "Bitmovin", "keyword": "streaming"},
+  {"company": "Bitmovin", "keyword": "encoding"},
+  {"company": "JWPlayer", "keyword": "video"},
+  {"company": "JWPlayer", "keyword": "media"},
+  {"company": "JWPlayer", "keyword": "streaming"},
+  {"company": "Brightcove", "keyword": "video"},
+  {"company": "Brightcove", "keyword": "media"},
+  {"company": "Brightcove", "keyword": "cloud"},
+  {"company": "Cloudflare", "keyword": "cloud"},
+  {"company": "Cloudflare", "keyword": "infrastructure"},
+  {"company": "Cloudflare", "keyword": "kubernetes"},
+  {"company": "Fastly", "keyword": "cloud"},
+  {"company": "Fastly", "keyword": "infrastructure"},
+  {"company": "Fastly", "keyword": "backend"},
+  {"company": "Firework", "keyword": "video"},
+  {"company": "Firework", "keyword": "media"},
+  {"company": "Firework", "keyword": "streaming"},
+  {"company": "Bambuser", "keyword": "video"},
+  {"company": "Bambuser", "keyword": "streaming"},
+  {"company": "Bambuser", "keyword": "cloud"},
+  {"company": "FloSports", "keyword": "media"},
+  {"company": "FloSports", "keyword": "streaming"},
+  {"company": "FloSports", "keyword": "video"},
+  {"company": "StageNet", "keyword": "media"},
+  {"company": "StageNet", "keyword": "cloud"},
+  {"company": "StageNet", "keyword": "infrastructure"},
+  {"company": "Uscreen", "keyword": "video"},
+  {"company": "Uscreen", "keyword": "media"},
+  {"company": "Uscreen", "keyword": "streaming"},
+  {"company": "Mmhmm", "keyword": "video"},
+  {"company": "Mmhmm", "keyword": "media"},
+  {"company": "Mmhmm", "keyword": "cloud"},
+  {"company": "StreamYard", "keyword": "video"},
+  {"company": "StreamYard", "keyword": "streaming"},
+  {"company": "StreamYard", "keyword": "cloud"}
+][0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:664 - [34m  Plan generated:
+[
+  {
+    "company": "Amazon",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Amazon",
+    "keyword": "backend"
+  },
+  {
+    "company": "Amazon",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Apple",
+    "keyword": "media"
+  },
+  {
+    "company": "Apple",
+    "keyword": "video"
+  },
+  {
+    "company": "Apple",
+    "keyword": "encoding"
+  },
+  {
+    "company": "Google",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Google",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Google",
+    "keyword": "kubernetes"
+  },
+  {
+    "company": "Meta",
+    "keyword": "video"
+  },
+  {
+    "company": "Meta",
+    "keyword": "backend"
+  },
+  {
+    "company": "Meta",
+    "keyword": "lead"
+  },
+  {
+    "company": "Microsoft",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Microsoft",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Microsoft",
+    "keyword": "principal"
+  },
+  {
+    "company": "Netflix",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Netflix",
+    "keyword": "media"
+  },
+  {
+    "company": "Netflix",
+    "keyword": "encoding"
+  },
+  {
+    "company": "NVIDIA",
+    "keyword": "video"
+  },
+  {
+    "company": "NVIDIA",
+    "keyword": "encoding"
+  },
+  {
+    "company": "NVIDIA",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "OpenAI",
+    "keyword": "cloud"
+  },
+  {
+    "company": "OpenAI",
+    "keyword": "backend"
+  },
+  {
+    "company": "OpenAI",
+    "keyword": "principal"
+  },
+  {
+    "company": "Anthropic",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Anthropic",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Anthropic",
+    "keyword": "lead"
+  },
+  {
+    "company": "Disney",
+    "keyword": "media"
+  },
+  {
+    "company": "Disney",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Disney",
+    "keyword": "video"
+  },
+  {
+    "company": "Hulu",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Hulu",
+    "keyword": "media"
+  },
+  {
+    "company": "Hulu",
+    "keyword": "backend"
+  },
+  {
+    "company": "TikTok",
+    "keyword": "video"
+  },
+  {
+    "company": "TikTok",
+    "keyword": "media"
+  },
+  {
+    "company": "TikTok",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Snap",
+    "keyword": "video"
+  },
+  {
+    "company": "Snap",
+    "keyword": "backend"
+  },
+  {
+    "company": "Snap",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Zoom",
+    "keyword": "video"
+  },
+  {
+    "company": "Zoom",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Zoom",
+    "keyword": "kubernetes"
+  },
+  {
+    "company": "Cisco",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Cisco",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Cisco",
+    "keyword": "backend"
+  },
+  {
+    "company": "Comcast",
+    "keyword": "media"
+  },
+  {
+    "company": "Comcast",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Comcast",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Warner Bros. Discovery",
+    "keyword": "media"
+  },
+  {
+    "company": "Warner Bros. Discovery",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Warner Bros. Discovery",
+    "keyword": "video"
+  },
+  {
+    "company": "Paramount",
+    "keyword": "media"
+  },
+  {
+    "company": "Paramount",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Paramount",
+    "keyword": "backend"
+  },
+  {
+    "company": "IBM",
+    "keyword": "cloud"
+  },
+  {
+    "company": "IBM",
+    "keyword": "kubernetes"
+  },
+  {
+    "company": "IBM",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Valve",
+    "keyword": "media"
+  },
+  {
+    "company": "Valve",
+    "keyword": "video"
+  },
+  {
+    "company": "Valve",
+    "keyword": "backend"
+  },
+  {
+    "company": "Livepeer",
+    "keyword": "video"
+  },
+  {
+    "company": "Livepeer",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Livepeer",
+    "keyword": "encoding"
+  },
+  {
+    "company": "Twelve Labs",
+    "keyword": "video"
+  },
+  {
+    "company": "Twelve Labs",
+    "keyword": "media"
+  },
+  {
+    "company": "Twelve Labs",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Tapcart",
+    "keyword": "backend"
+  },
+  {
+    "company": "Tapcart",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Tapcart",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Mux",
+    "keyword": "video"
+  },
+  {
+    "company": "Mux",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Mux",
+    "keyword": "encoding"
+  },
+  {
+    "company": "Apporto",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Apporto",
+    "keyword": "backend"
+  },
+  {
+    "company": "Apporto",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "GreyNoise",
+    "keyword": "cloud"
+  },
+  {
+    "company": "GreyNoise",
+    "keyword": "backend"
+  },
+  {
+    "company": "GreyNoise",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Daily.co",
+    "keyword": "video"
+  },
+  {
+    "company": "Daily.co",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Daily.co",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Temporal Technologies",
+    "keyword": "backend"
+  },
+  {
+    "company": "Temporal Technologies",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Temporal Technologies",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Bitmovin",
+    "keyword": "video"
+  },
+  {
+    "company": "Bitmovin",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Bitmovin",
+    "keyword": "encoding"
+  },
+  {
+    "company": "JWPlayer",
+    "keyword": "video"
+  },
+  {
+    "company": "JWPlayer",
+    "keyword": "media"
+  },
+  {
+    "company": "JWPlayer",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Brightcove",
+    "keyword": "video"
+  },
+  {
+    "company": "Brightcove",
+    "keyword": "media"
+  },
+  {
+    "company": "Brightcove",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Cloudflare",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Cloudflare",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Cloudflare",
+    "keyword": "kubernetes"
+  },
+  {
+    "company": "Fastly",
+    "keyword": "cloud"
+  },
+  {
+    "company": "Fastly",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Fastly",
+    "keyword": "backend"
+  },
+  {
+    "company": "Firework",
+    "keyword": "video"
+  },
+  {
+    "company": "Firework",
+    "keyword": "media"
+  },
+  {
+    "company": "Firework",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Bambuser",
+    "keyword": "video"
+  },
+  {
+    "company": "Bambuser",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Bambuser",
+    "keyword": "cloud"
+  },
+  {
+    "company": "FloSports",
+    "keyword": "media"
+  },
+  {
+    "company": "FloSports",
+    "keyword": "streaming"
+  },
+  {
+    "company": "FloSports",
+    "keyword": "video"
+  },
+  {
+    "company": "StageNet",
+    "keyword": "media"
+  },
+  {
+    "company": "StageNet",
+    "keyword": "cloud"
+  },
+  {
+    "company": "StageNet",
+    "keyword": "infrastructure"
+  },
+  {
+    "company": "Uscreen",
+    "keyword": "video"
+  },
+  {
+    "company": "Uscreen",
+    "keyword": "media"
+  },
+  {
+    "company": "Uscreen",
+    "keyword": "streaming"
+  },
+  {
+    "company": "Mmhmm",
+    "keyword": "video"
+  },
+  {
+    "company": "Mmhmm",
+    "keyword": "media"
+  },
+  {
+    "company": "Mmhmm",
+    "keyword": "cloud"
+  },
+  {
+    "company": "StreamYard",
+    "keyword": "video"
+  },
+  {
+    "company": "StreamYard",
+    "keyword": "streaming"
+  },
+  {
+    "company": "StreamYard",
+    "keyword": "cloud"
+  }
+][0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:675 - [34m  Plan breakdown: 120 total pairs[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:676 - [34m    - Major companies: 60 pairs[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:677 - [34m    - Startup companies: 60 pairs[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:681 - [34m  Valid search pairs: 120[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:686 - [34m  Sample search pairs: [JobSearchPair(company='Amazon', keyword='cloud'), JobSearchPair(company='Amazon', keyword='backend'), JobSearchPair(company='Amazon', keyword='infrastructure'), JobSearchPair(company='Apple', keyword='media'), JobSearchPair(company='Apple', keyword='video')][0m
+2025-05-13 20:18:38 [INFO] jobbot.__exit__:326 - [34m✓ COMPLETED: Planning Phase in 14.53s[0m
+2025-05-13 20:18:38 [INFO] jobbot.__enter__:318 - [34m▶ STARTED: Search Phase[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:702 - [34m  Search quotas - Major: 10, Startup: 10[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:706 - [34m  Executing up to 40 searches from plan with 120 pairs[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:18:38 [INFO] jobbot.gather:726 - [34m  Search 1/40: cloud jobs at Amazon (Major)[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.gather:729 - [37m  Search query: Amazon cloud jobs careers software engineering apply[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Amazon-cloud[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:18:38 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find cloud jobs at Amazon (Major) with web search. Search query: Amazon cloud jobs careers software ...[0m
+2025-05-13 20:18:38 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:19:00 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 22.43s[0m
+2025-05-13 20:19:00 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that I couldn't extract specific job listings from the search results. If you need further assistance or want to refine the search, please let me know![0m
+2025-05-13 20:19:00 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 22.44s[0m
+2025-05-13 20:19:00 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that I couldn't extract specific job listings from the search results. If you need further assistance or want to refine the search, please let me know![0m
+2025-05-13 20:19:00 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:19:00 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:19:00 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that I couldn't extract specific job listings from the se...[0m
+2025-05-13 20:19:00 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 3.25s[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:19:03 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 3.25s[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:19:03 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Amazon[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Amazon-cloud in 25.69s[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:19:03 [INFO] jobbot.gather:726 - [34m  Search 2/40: backend jobs at Amazon (Major)[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.gather:729 - [37m  Search query: Amazon backend jobs careers software engineering apply[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Amazon-backend[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:19:03 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find backend jobs at Amazon (Major) with web search. Search query: Amazon backend jobs careers softw...[0m
+2025-05-13 20:19:03 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:19:19 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 15.76s[0m
+2025-05-13 20:19:19 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings could not be extracted successfully. If you need further assistance or specific details about any of the roles, please let me know![0m
+2025-05-13 20:19:19 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 15.77s[0m
+2025-05-13 20:19:19 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings could not be extracted successfully. If you need further assistance or specific details about any of the roles, please let me know![0m
+2025-05-13 20:19:19 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:19:19 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:19:19 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings could not be extracted successfully...[0m
+2025-05-13 20:19:19 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 0.54s[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:19:20 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 0.54s[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:19:20 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Amazon[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Amazon-backend in 16.31s[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:19:20 [INFO] jobbot.gather:726 - [34m  Search 3/40: infrastructure jobs at Amazon (Major)[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.gather:729 - [37m  Search query: Amazon infrastructure jobs careers software engineering apply[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Amazon-infrastructure[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:19:20 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find infrastructure jobs at Amazon (Major) with web search. Search query: Amazon infrastructure jobs...[0m
+2025-05-13 20:19:20 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:19:58 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 38.62s[0m
+2025-05-13 20:19:58 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the extraction process did not yield any structured job listings. If you need further assistance or specific details about any of the positions, please let me know![0m
+2025-05-13 20:19:58 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 38.62s[0m
+2025-05-13 20:19:58 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the extraction process did not yield any structured job listings. If you need further assistance or specific details about any of the positions, please let me know![0m
+2025-05-13 20:19:58 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:19:58 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:19:58 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the extraction process did not yield any structured ...[0m
+2025-05-13 20:19:58 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 0.76s[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:19:59 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 0.76s[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:19:59 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Amazon[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Amazon-infrastructure in 39.38s[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:19:59 [INFO] jobbot.gather:726 - [34m  Search 4/40: media jobs at Apple (Major)[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.gather:729 - [37m  Search query: Apple media jobs careers software engineering apply[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Apple-media[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:19:59 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find media jobs at Apple (Major) with web search. Search query: Apple media jobs careers software en...[0m
+2025-05-13 20:19:59 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:20:24 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 25.14s[0m
+2025-05-13 20:20:24 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that I couldn't extract any job listings from the search results. If you would like, I can try searching again or refine the query. Let me know how you'd like to proceed![0m
+2025-05-13 20:20:24 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 25.14s[0m
+2025-05-13 20:20:24 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that I couldn't extract any job listings from the search results. If you would like, I can try searching again or refine the query. Let me know how you'd like to proceed![0m
+2025-05-13 20:20:24 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:20:24 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:20:24 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that I couldn't extract any job listings from the search ...[0m
+2025-05-13 20:20:24 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 0.54s[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:20:25 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 0.54s[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:20:25 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Apple[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Apple-media in 25.69s[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:20:25 [INFO] jobbot.gather:726 - [34m  Search 5/40: video jobs at Apple (Major)[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.gather:729 - [37m  Search query: Apple video jobs careers software engineering apply[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Apple-video[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:20:25 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find video jobs at Apple (Major) with web search. Search query: Apple video jobs careers software en...[0m
+2025-05-13 20:20:25 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 18.89s[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings could not be extracted successfully. If you need further assistance or specific details about any of the positions, please let me know![0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 18.89s[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings could not be extracted successfully. If you need further assistance or specific details about any of the positions, please let me know![0m
+2025-05-13 20:20:44 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:20:44 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings could not be extracted successfully...[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 0.53s[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 0.53s[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:20:44 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Apple[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Apple-video in 19.42s[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:20:44 [INFO] jobbot.gather:726 - [34m  Search 6/40: encoding jobs at Apple (Major)[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.gather:729 - [37m  Search query: Apple encoding jobs careers software engineering apply[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Apple-encoding[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:20:44 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find encoding jobs at Apple (Major) with web search. Search query: Apple encoding jobs careers softw...[0m
+2025-05-13 20:20:44 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 45.50s[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings extracted did not yield any structured data. However, here are the details of the encoding-related software engineering positions at Apple that I found:
+
+1. **Video Codec Engineering Manager**
+   - **Location:** San Diego, CA
+   - **Posted:** October 15, 2024
+   - **Role Number:** 200573508
+   - **Description:** Lead a team of video codec and system software engineers to develop and productize Apple's Video Encoder and Media Engine software stack across various App...[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 45.50s[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings extracted did not yield any structured data. However, here are the details of the encoding-related software engineering positions at Apple that I found:
+
+1. **Video Codec Engineering Manager**
+   - **Location:** San Diego, CA
+   - **Posted:** October 15, 2024
+   - **Role Number:** 200573508
+   - **Description:** Lead a team of video codec and system software engineers to develop and productize Apple's Video Encoder and Media Engine software stack across various App...[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:21:30 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings extracted did not yield any structu...[0m
+2025-05-13 20:21:30 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 5.21s[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: ```json
+[
+  {
+    "title": "Video Codec Engineering Manager",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/video-codec-engineering-manager-31b5e9?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Software Engineering Manager - Media Processing",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/software-engineering-manager-media-processing?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Silicon Validation Software Enginee...[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 5.27s[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:762 - [37m    Processor output: ```json
+[
+  {
+    "title": "Video Codec Engineering Manager",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/video-codec-engineering-manager-31b5e9?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Software Engineering Manager - Media Processing",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/software-engineering-manager-media-processing?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Silicon Validation Software Engineer: Video Encoder/Compression Validation",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/silicon-validation-software-engineer-video-encodercompression-validation-e77232?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Video Codec Algorithm Engineer",
+    "company": "Apple",
+    "url": "https://www.themuse.com/jobs/apple/video-codec-algorithm-engineer-074b5f?utm_source=openai",
+    "type": "Major"
+  }
+]
+```[0m
+2025-05-13 20:21:35 [INFO] jobbot.gather:842 - [34m    Found 4 potential job listings for Apple[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:868 - [37m    Job 1: Video Codec Engineering Manager at Apple[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:880 - [37m    Added major job: Video Codec Engineering Manager[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:868 - [37m    Job 2: Software Engineering Manager - Media Processing at Apple[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineering Manager - Media Processing[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:868 - [37m    Job 3: Silicon Validation Software Engineer: Video Encoder/Compression Validation at Apple[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:880 - [37m    Added major job: Silicon Validation Software Engineer: Video Encoder/Compression Validation[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:868 - [37m    Job 4: Video Codec Algorithm Engineer at Apple[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:880 - [37m    Added major job: Video Codec Algorithm Engineer[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Apple-encoding in 50.78s[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:21:35 [INFO] jobbot.gather:726 - [34m  Search 7/40: streaming jobs at Google (Major)[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:729 - [37m  Search query: Google streaming jobs careers software engineering apply[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Google-streaming[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:21:35 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find streaming jobs at Google (Major) with web search. Search query: Google streaming jobs careers s...[0m
+2025-05-13 20:21:35 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 20.37s[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings extracted did not yield any structured results. However, you can still find the relevant positions directly through the links provided in the search results. Here are the key positions again:
+
+1. **Software Engineer III, Infrastructure, Google TV**
+   - **Location:** San Jose, CA, USA
+   - **Responsibilities:** Design and develop software solutions for Google TV, manage project priorities, and work on large-scale infrastructure.
+   - **Qualifications:** Bachelor's ...[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 20.37s[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings extracted did not yield any structured results. However, you can still find the relevant positions directly through the links provided in the search results. Here are the key positions again:
+
+1. **Software Engineer III, Infrastructure, Google TV**
+   - **Location:** San Jose, CA, USA
+   - **Responsibilities:** Design and develop software solutions for Google TV, manage project priorities, and work on large-scale infrastructure.
+   - **Qualifications:** Bachelor's ...[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:21:55 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings extracted did not yield any structu...[0m
+2025-05-13 20:21:55 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 5.19s[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: ```json
+[
+  {
+    "title": "Software Engineer III, Infrastructure, Google TV",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/115652162783978182-software-engineer-iii/?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Video Streaming Specialist, gTech Professional Services",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/122601961403884230-video-streaming-specialists/?utm_source...[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 5.19s[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:762 - [37m    Processor output: ```json
+[
+  {
+    "title": "Software Engineer III, Infrastructure, Google TV",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/115652162783978182-software-engineer-iii/?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Video Streaming Specialist, gTech Professional Services",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/122601961403884230-video-streaming-specialists/?utm_source=openai",
+    "type": "Major"
+  }
+]
+```[0m
+2025-05-13 20:22:00 [INFO] jobbot.gather:842 - [34m    Found 2 potential job listings for Google[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:868 - [37m    Job 1: Software Engineer III, Infrastructure, Google TV at Google[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineer III, Infrastructure, Google TV[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:868 - [37m    Job 2: Video Streaming Specialist, gTech Professional Services at Google[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:880 - [37m    Added major job: Video Streaming Specialist, gTech Professional Services[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Google-streaming in 25.57s[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:22:00 [INFO] jobbot.gather:726 - [34m  Search 8/40: cloud jobs at Google (Major)[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:729 - [37m  Search query: Google cloud jobs careers software engineering apply[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Google-cloud[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:22:00 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find cloud jobs at Google (Major) with web search. Search query: Google cloud jobs careers software ...[0m
+2025-05-13 20:22:00 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:22:31 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 30.44s[0m
+2025-05-13 20:22:31 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems there was an issue extracting the job listings. However, I provided the raw search results earlier, which contain detailed information about the available positions at Google Cloud. If you need further assistance or specific details, please let me know![0m
+2025-05-13 20:22:31 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 30.44s[0m
+2025-05-13 20:22:31 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems there was an issue extracting the job listings. However, I provided the raw search results earlier, which contain detailed information about the available positions at Google Cloud. If you need further assistance or specific details, please let me know![0m
+2025-05-13 20:22:31 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:22:31 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:22:31 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems there was an issue extracting the job listings. However, ...[0m
+2025-05-13 20:22:31 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 0.66s[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: [][0m
+2025-05-13 20:22:32 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 0.66s[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.gather:762 - [37m    Processor output: [][0m
+2025-05-13 20:22:32 [INFO] jobbot.gather:842 - [34m    Found 0 potential job listings for Google[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Google-cloud in 31.11s[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:22:32 [INFO] jobbot.gather:726 - [34m  Search 9/40: kubernetes jobs at Google (Major)[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.gather:729 - [37m  Search query: Google kubernetes jobs careers software engineering apply[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Google-kubernetes[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:22:32 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find kubernetes jobs at Google (Major) with web search. Search query: Google kubernetes jobs careers...[0m
+2025-05-13 20:22:32 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m

@@ -1,0 +1,6 @@
+2025-05-13 20:19:18 [INFO] jobbot.setup_enhanced_logger:283 - [34mLogging to file: logs/responses_job_search.log[0m
+2025-05-13 20:19:18 [INFO] jobbot.setup_enhanced_logger:299 - [34mAPI logging to file: logs/responses_job_search.api.log[0m
+2025-05-13 20:19:38 [INFO] jobbot.setup_enhanced_logger:283 - [34mLogging to file: logs/responses_job_search.log[0m
+2025-05-13 20:19:38 [INFO] jobbot.setup_enhanced_logger:299 - [34mAPI logging to file: logs/responses_job_search.api.log[0m
+2025-05-13 20:19:45 [INFO] jobbot.setup_enhanced_logger:283 - [34mLogging to file: logs/responses_job_search.log[0m
+2025-05-13 20:19:45 [INFO] jobbot.setup_enhanced_logger:299 - [34mAPI logging to file: logs/responses_job_search.api.log[0m
