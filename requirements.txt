@@ -7,3 +7,4 @@ pandas==2.1.4
 python-dotenv==1.0.1
 matplotlib==3.8.4
 tabulate==0.9.0     # For Markdown table generation
+networkx>=3.4       # For agent visualization

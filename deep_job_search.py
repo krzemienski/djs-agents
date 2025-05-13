@@ -29,6 +29,11 @@ except ImportError:
     HAS_TRACING = False
 from pydantic import BaseModel
 
+# Import our new modules
+from logger_utils import setup_enhanced_logger, DepthContext
+from api_wrapper import initialize_api_wrapper, get_api_wrapper
+from agent_visualizer import initialize_visualizer, get_visualizer
+
 load_dotenv()
 
 OUTPUT_DIR = Path(__file__).with_suffix("")
@@ -65,52 +70,53 @@ class JobListing(BaseModel):
 
 # ------------- logging -------------
 def setup_logger(level:str='INFO', file:str|None=None)->logging.Logger:
-    """Set up the logger with enhanced format and handlers."""
-    logger = logging.getLogger('jobbot')
-    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
+    """Set up the enhanced logger with improved format and API logging capabilities."""
+    # Create API log file path if a main log file is provided
+    api_log_file = None
+    if file:
+        api_log_file = Path(file).with_suffix('.api.log')
 
-    # Create a detailed formatter with time, level, and module/function info
-    fmt = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(module)s.%(funcName)s:%(lineno)d - %(message)s',
-        '%Y-%m-%d %H:%M:%S'
+    # Create logs directory structure
+    logs_dir = Path('logs')
+    logs_dir.mkdir(exist_ok=True)
+
+    visuals_dir = logs_dir / 'visuals'
+    visuals_dir.mkdir(exist_ok=True)
+
+    # Initialize the visualizer
+    initialize_visualizer(visuals_dir)
+
+    # Set up the enhanced logger
+    logger = setup_enhanced_logger(
+        level=level,
+        file=file,
+        api_log_file=api_log_file
     )
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(fmt)
-    logger.addHandler(console_handler)
+    # Initialize the API wrapper with our logger
+    initialize_api_wrapper(logger)
 
-    # File handler if specified
-    if file:
-        # Make sure parent directory exists
-        Path(file).parent.mkdir(exist_ok=True, parents=True)
-        file_handler = logging.FileHandler(file)
-        file_handler.setFormatter(fmt)
-        logger.addHandler(file_handler)
-        logger.info(f"Logging to file: {file}")
-
-    # Test log message
-    logger.debug("Logger initialized")
+    # Log diagnostic info
+    logger.debug(f"Logger initialized with level: {level}")
+    logger.debug(f"Python version: {sys.version}")
 
     return logger
 
 class Timer:
-    """Enhanced timer context manager with more detailed timing info."""
+    """Enhanced timer context manager with more detailed timing info using DepthContext."""
     def __init__(self, label, logger, log_level='INFO'):
         self.label = label
         self.logger = logger
         self.log_level = log_level
-        self.start_time = None
+        self.depth_context = None
 
     def __enter__(self):
-        self.start_time = time.perf_counter()
-        self.logger.debug(f"▶ STARTED: {self.label}")
+        self.depth_context = DepthContext(self.logger, self.label, self.log_level)
+        self.depth_context.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        duration = time.perf_counter() - self.start_time
-        level = getattr(logging, self.log_level)
-        self.logger.log(level, f"COMPLETED: {self.label} in {duration:.2f}s")
+        self.depth_context.__exit__(exc_type, exc_val, exc_tb)
         if exc_type:
             self.logger.error(f"ERROR in {self.label}: {exc_val}")
 
@@ -269,7 +275,7 @@ Return results as a valid JSON array of objects:
 
 # ------------- token monitoring -------------
 class TokenMonitor:
-    """Track and budget token usage across different phases"""
+    """Track and budget token usage across different phases with enhanced logging"""
 
     # Cost per 1K tokens (as of 2025)
     COST_PER_1K = {
@@ -329,6 +335,14 @@ class TokenMonitor:
         self.warnings_shown = set()
         self.total_tokens_used = 0
 
+        # Track API calls by phase
+        self.api_calls_by_phase = {
+            'plan': 0,
+            'search': 0,
+            'process': 0,
+            'verify': 0
+        }
+
     def get_model_rate(self, model: str) -> float:
         """Get the cost rate for a model, with fallback for unknown models"""
         base_model = model.split('-preview')[0].split('-vision')[0]
@@ -368,7 +382,24 @@ class TokenMonitor:
             (verify_total / 1000) * self.get_model_rate(verifier_model)
         )
 
+        # Log detailed estimates
+        self.logger.debug(f"Token estimate breakdown:")
+        self.logger.debug(f"  - Planning ({planner_model}): {plan_tokens:,} tokens (${(plan_tokens/1000)*self.get_model_rate(planner_model):.4f})")
+        self.logger.debug(f"  - Search/Process ({search_model}): {search_total:,} tokens (${(search_total/1000)*self.get_model_rate(search_model):.4f})")
+        self.logger.debug(f"  - Verification ({verifier_model}): {verify_total:,} tokens (${(verify_total/1000)*self.get_model_rate(verifier_model):.4f})")
+
         return total_tokens, cost
+
+    def track_api_call(self, phase: str):
+        """Track an API call for a specific phase"""
+        if phase in self.api_calls_by_phase:
+            self.api_calls_by_phase[phase] += 1
+
+        # Also track in the visualizer
+        visualizer = get_visualizer()
+        if hasattr(visualizer, 'track_api_call'):
+            # This is a placeholder - in a real implementation, we'd pass actual API call details
+            visualizer.track_api_call(f"{phase}_call", "completion", True, 0.5)
 
     def check_budget(self, phase: str) -> bool:
         """Check if we're within budget for a phase"""
@@ -385,6 +416,9 @@ class TokenMonitor:
 
         # Update phase usage
         self.phase_usage[phase] += phase_delta
+
+        # Log phase usage update
+        self.logger.debug(f"Phase '{phase}' token usage updated: +{phase_delta:,} tokens, now {self.phase_usage[phase]:,} tokens")
 
         # Check if we're over budget for this phase
         if self.phase_usage[phase] > self.phase_budgets[phase]:
@@ -439,24 +473,60 @@ class TokenMonitor:
         return total_cost
 
     def log_usage(self, phase=None) -> None:
-        """Log the current token usage"""
+        """Log the current token usage with enhanced detail"""
         if phase:
             self.logger.info(f"Phase '{phase}' token usage: {self.phase_usage[phase]:,} tokens")
+            if phase in self.api_calls_by_phase and self.api_calls_by_phase[phase] > 0:
+                self.logger.info(f"Phase '{phase}' API calls: {self.api_calls_by_phase[phase]}")
 
         try:
             self.logger.info(f"Current token usage by model:")
+            token_usage_by_model = []
+            total_tokens = 0
+            total_cost = 0.0
+
             for model, tokens in agent_usage.tokens_per_model.items():
                 rate = self.get_model_rate(model)
                 cost = (tokens / 1000) * rate
+                total_tokens += tokens
+                total_cost += cost
+                token_usage_by_model.append({
+                    'model': model,
+                    'tokens': tokens,
+                    'cost': cost
+                })
                 self.logger.info(f"  - {model}: {tokens:,} tokens (${cost:.4f})")
 
-            total_tokens = sum(agent_usage.tokens_per_model.values())
+            # Update the visualizer with token usage
+            visualizer = get_visualizer()
+            for entry in token_usage_by_model:
+                if hasattr(visualizer, 'track_agent_call') and phase:
+                    # This tracks token usage in the visualizer
+                    visualizer.track_agent_call(
+                        agent_name=phase,
+                        input_text="",
+                        output_text="",
+                        duration=0.1,
+                        tokens_used={entry['model']: entry['tokens']}
+                    )
+
         except (AttributeError, TypeError):
             self.logger.info(f"Token usage details not available from API")
             total_tokens = self.total_tokens_used
+            total_cost = self.get_current_cost()
 
-        total_cost = self.get_current_cost()
-        self.logger.info(f"Total usage: {total_tokens:,}/{self.max_tokens:,} tokens (${total_cost:.4f})")
+        # Calculate usage percentages
+        percent_used = (total_tokens / self.max_tokens) * 100 if self.max_tokens > 0 else 0
+        self.logger.info(f"Total usage: {total_tokens:,}/{self.max_tokens:,} tokens " +
+                         f"({percent_used:.1f}%, ${total_cost:.4f})")
+
+        # Log API calls
+        total_api_calls = sum(self.api_calls_by_phase.values())
+        if total_api_calls > 0:
+            self.logger.info(f"Total API calls: {total_api_calls}")
+            for phase, count in self.api_calls_by_phase.items():
+                if count > 0:
+                    self.logger.debug(f"  - {phase}: {count} calls")
 
 # ------------- gather --------------
 async def gather(cfg, logger)->List[Dict[str,str]]:
@@ -487,57 +557,75 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
                 logger.info("\nAborting job search")
                 return []
 
+    # Get API wrapper
+    api = get_api_wrapper()
+
+    # Get visualizer
+    visualizer = get_visualizer()
+
     # Initialize agents with detailed logging
-    logger.info(f"Initializing Planner agent with model: {cfg['planner_model']}")
-    planner = Agent(
-        name="planner",
-        instructions=planner_prompt(),
-        model=cfg['planner_model'],
-        model_settings=ModelSettings(temperature=0)
-    )
+    with DepthContext(logger, "Agent Initialization"):
+        logger.info(f"Initializing Planner agent with model: {cfg['planner_model']}")
+        planner = await api.create_agent(
+            name="planner",
+            instructions=planner_prompt(),
+            model=cfg['planner_model'],
+            model_settings=ModelSettings(temperature=0)
+        )
 
-    logger.info(f"Initializing Processor agent with model: {cfg['search_model']}")
-    processor = Agent(
-        name="processor",
-        instructions=processor_prompt(),
-        model=cfg['search_model'],
-        model_settings=ModelSettings(temperature=0)
-    )
+        logger.info(f"Initializing Processor agent with model: {cfg['search_model']}")
+        processor = await api.create_agent(
+            name="processor",
+            instructions=processor_prompt(),
+            model=cfg['search_model'],
+            model_settings=ModelSettings(temperature=0)
+        )
 
-    logger.info(f"Initializing Verifier agent with model: {cfg['verifier_model']}")
-    # Configure verifier tools based on web search option
-    verifier_tools = []
-    if cfg.get('use_web_verify', False):
-        logger.info("Web search verification mode enabled")
-        verifier_tools.append(WebSearchTool())
+        logger.info(f"Initializing Verifier agent with model: {cfg['verifier_model']}")
+        # Configure verifier tools based on web search option
+        verifier_tools = []
+        if cfg.get('use_web_verify', False):
+            logger.info("Web search verification mode enabled")
+            verifier_tools.append(WebSearchTool())
 
-    verifier = Agent(
-        name="verifier",
-        instructions=verifier_prompt(),
-        tools=verifier_tools,
-        model=cfg['verifier_model'],
-        model_settings=ModelSettings(temperature=0)
-    )
+        verifier = await api.create_agent(
+            name="verifier",
+            instructions=verifier_prompt(),
+            tools=verifier_tools,
+            model=cfg['verifier_model'],
+            model_settings=ModelSettings(temperature=0)
+        )
 
-    # Set up the processor to hand off to verifier
-    processor.handoffs = [verifier]
+        # Set up the processor to hand off to verifier
+        processor.handoffs = [verifier]
 
-    logger.info(f"Initializing Searcher agent with model: {cfg['search_model']}")
-    searcher = Agent(
-        name="searcher",
-        instructions=searcher_prompt(),
-        tools=[WebSearchTool(), extract_job_listings],
-        model=cfg['search_model'],
-        model_settings=ModelSettings(temperature=0),
-        # Set up searcher to hand off to processor
-        handoffs=[processor]
-    )
+        # Track the handoff in the visualizer
+        visualizer.track_handoff("processor", "verifier", "Job verification handoff")
+
+        logger.info(f"Initializing Searcher agent with model: {cfg['search_model']}")
+        searcher = await api.create_agent(
+            name="searcher",
+            instructions=searcher_prompt(),
+            tools=[WebSearchTool(), extract_job_listings],
+            model=cfg['search_model'],
+            model_settings=ModelSettings(temperature=0),
+            # Set up searcher to hand off to processor
+            handoffs=[processor]
+        )
+
+        # Track the handoff in the visualizer
+        visualizer.track_handoff("searcher", "processor", "Job processing handoff")
 
     search_plan = []
     with Timer('Planning Phase', logger):
         # Generate search plan
         logger.info("Generating job search plan...")
-        plan_result = await Runner.run(planner, input="Generate a comprehensive job search plan covering both major companies and startups")
+
+        # Track API call
+        token_monitor.track_api_call('plan')
+
+        # Run the planner agent
+        plan_result = await api.run_agent(planner, "Generate a comprehensive job search plan covering both major companies and startups")
         plan_json = plan_result.final_output
 
         # Check token budget after planning
@@ -549,9 +637,33 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
 
         # Try to pretty-print JSON if possible
         try:
-            formatted_plan = json.dumps(json.loads(plan_json), indent=2)
+            # Strip markdown code blocks if present
+            plan_json = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', plan_json)
+            plan_json = plan_json.strip()
+
+            # Try to parse the JSON
+            try:
+                # Direct parsing attempt
+                plan_data = json.loads(plan_json)
+                formatted_plan = json.dumps(plan_data, indent=2)
+            except json.JSONDecodeError:
+                # Try to extract JSON array if embedded in text
+                match = re.search(r'\[\s*{.*}\s*\]', plan_json, re.DOTALL)
+                if match:
+                    extracted_json = match.group(0)
+                    plan_data = json.loads(extracted_json)
+                    formatted_plan = json.dumps(plan_data, indent=2)
+                else:
+                    # Replace single quotes with double quotes
+                    sanitized_json = re.sub(r"'([^']*)'", r'"\1"', plan_json)
+                    # Quote unquoted keys
+                    sanitized_json = re.sub(r"(\w+):", r'"\1":', sanitized_json)
+                    plan_data = json.loads(sanitized_json)
+                    formatted_plan = json.dumps(plan_data, indent=2)
+
             logger.info(f"Plan generated:\n{formatted_plan}")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not format plan as JSON: {e}")
             logger.info(f"Plan generated (raw):\n{plan_json}")
 
         try:
@@ -617,22 +729,46 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
             logger.debug(f"Search query: {search_query}")
 
             try:
-                with Timer(f"Search: {company}-{keyword}", logger, log_level='DEBUG'):
+                with DepthContext(logger, f"Search: {company}-{keyword}", log_level='DEBUG'):
+                    # Track API call
+                    token_monitor.track_api_call('search')
+
                     # Perform search
                     logger.debug(f"Executing web search via {cfg['search_model']} model")
-                    search_result = await Runner.run(searcher, input=f"Find {keyword} jobs at {company} ({company_type}) with web search. Search query: {search_query}")
+                    search_result = await api.run_agent(searcher,
+                                                       f"Find {keyword} jobs at {company} ({company_type}) with web search. Search query: {search_query}")
                     search_output = search_result.final_output
 
                     # Log search result truncated for readability
                     truncated_output = search_output[:500] + "..." if len(search_output) > 500 else search_output
                     logger.debug(f"Search result: {truncated_output}")
 
+                    # Track this in the visualizer
+                    visualizer.track_agent_call(
+                        agent_name="searcher",
+                        input_text=search_query,
+                        output_text=search_output,
+                        duration=1.0,  # Placeholder duration
+                        tokens_used=None  # We'll update this later
+                    )
+
                     # Process results
+                    token_monitor.track_api_call('process')
                     logger.debug(f"Processing search results via {cfg['search_model']} model")
-                    process_result = await Runner.run(processor, input=f"Process these job search results: {search_output}")
+                    process_result = await api.run_agent(processor,
+                                                        f"Process these job search results: {search_output}")
 
                     processor_output = process_result.final_output
                     logger.debug(f"Processor output: {processor_output}")
+
+                    # Track this in the visualizer
+                    visualizer.track_agent_call(
+                        agent_name="processor",
+                        input_text=search_output[:100] + "...", # Truncated for visualizer
+                        output_text=processor_output,
+                        duration=0.5,  # Placeholder duration
+                        tokens_used=None
+                    )
 
                     # Try to parse the output as JSON
                     try:
@@ -640,6 +776,10 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
                         if not processor_output or processor_output.strip() == '':
                             logger.warning(f"Empty processor output for {company} {keyword} search")
                             continue
+
+                        # Strip markdown code blocks if present
+                        processor_output = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', processor_output)
+                        processor_output = processor_output.strip()
 
                         # Try to normalize the JSON if it's not properly formatted
                         if not processor_output.strip().startswith('['):
@@ -661,14 +801,39 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
                         # Parse the JSON output
                         try:
                             jobs_data = json.loads(processor_output)
-                        except json.JSONDecodeError:
-                            # As a fallback, try to sanitize the output
-                            processor_output = re.sub(r"'([^']*)'", r'"\1"', processor_output)  # Replace single quotes with double quotes
-                            processor_output = re.sub(r"(\w+):", r'"\1":', processor_output)  # Quote unquoted keys
-                            logger.debug(f"Sanitized JSON: {processor_output[:100]}...")
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"JSON decode error: {e}")
 
-                            # Try again with sanitized output
-                            jobs_data = json.loads(processor_output)
+                            # As a fallback, try to sanitize the output
+                            sanitized_output = re.sub(r"'([^']*)'", r'"\1"', processor_output)  # Replace single quotes with double quotes
+                            sanitized_output = re.sub(r"(\w+):", r'"\1":', sanitized_output)  # Quote unquoted keys
+                            logger.debug(f"Sanitized JSON: {sanitized_output[:100]}...")
+
+                            # Try to force it into valid JSON format by removing additional text before/after the array
+                            try:
+                                match = re.search(r'\[\s*{.*}\s*\]', sanitized_output, re.DOTALL)
+                                if match:
+                                    jobs_data = json.loads(match.group(0))
+                                else:
+                                    # Last resort attempt - extract array from a line-by-line basis
+                                    extraction_attempt = "["
+                                    in_json = False
+
+                                    for line in sanitized_output.split("\n"):
+                                        line = line.strip()
+                                        if line.startswith("["):
+                                            in_json = True
+                                        if in_json:
+                                            extraction_attempt += line
+                                        if line.endswith("]"):
+                                            in_json = False
+
+                                    logger.debug(f"Final extraction attempt: {extraction_attempt[:100]}...")
+                                    jobs_data = json.loads(extraction_attempt)
+                            except Exception as extraction_error:
+                                logger.error(f"Final JSON extraction failed: {extraction_error}")
+                                # Create an empty array if all parsing attempts fail
+                                jobs_data = []
 
                         # Ensure we have a list
                         if not isinstance(jobs_data, list):
@@ -749,6 +914,20 @@ async def gather(cfg, logger)->List[Dict[str,str]]:
     logger.info("Final token usage report:")
     token_monitor.log_usage()
 
+    # Generate visualizations
+    try:
+        with DepthContext(logger, "Generating visualizations"):
+            flow_diagram = visualizer.generate_flow_diagram(title="Job Search Agent Flow")
+            timeline_diagram = visualizer.generate_timeline_diagram(title="Job Search Timeline")
+            report_file = visualizer.generate_report()
+
+            logger.info(f"Visualizations generated:")
+            logger.info(f"  - Flow diagram: {flow_diagram}")
+            logger.info(f"  - Timeline: {timeline_diagram}")
+            logger.info(f"  - Report: {report_file}")
+    except Exception as e:
+        logger.error(f"Error generating visualizations: {e}")
+
     # Combine and return results
     results = verified_majors[:majors_quota] + verified_startups[:startups_quota]
 
@@ -777,11 +956,17 @@ async def verify_jobs(cfg, logger, jobs, major_type: bool = True) -> List[Dict[s
     company_type = "Major" if major_type else "Startup"
     logger.info(f"Verifying {len(jobs)} {company_type.lower()} company job URLs")
 
+    # Get API wrapper
+    api = get_api_wrapper()
+
+    # Get visualizer
+    visualizer = get_visualizer()
+
     verified_jobs = []
     verification_failures = 0
     verification_successes = 0
 
-    # Initialize verifier agent
+    # Configure verifier tools based on web search option
     logger.debug(f"Initializing verifier with model {cfg['verifier_model']}, web search: {cfg.get('use_web_verify', False)}")
 
     # Configure verifier tools based on web search option
@@ -790,7 +975,8 @@ async def verify_jobs(cfg, logger, jobs, major_type: bool = True) -> List[Dict[s
         logger.info("Web search verification mode enabled")
         verifier_tools.append(WebSearchTool())
 
-    verifier = Agent(
+    # Create the verifier agent
+    verifier = await api.create_agent(
         name="verifier",
         instructions=verifier_prompt(),
         tools=verifier_tools,
@@ -817,7 +1003,10 @@ async def verify_jobs(cfg, logger, jobs, major_type: bool = True) -> List[Dict[s
         logger.info(f"Verifying {company_type} job {i}/{len(jobs)}: {job_title} at {job_company}")
 
         try:
-            with Timer(f"Verify: {job_company}-{job_title}", logger, log_level='DEBUG'):
+            with DepthContext(logger, f"Verify: {job_company}-{job_title}", log_level='DEBUG'):
+                # Track API call
+                token_monitor.track_api_call('verify')
+
                 # Check URL format with regex rather than web search
                 # Common job URL patterns
                 valid_patterns = [
@@ -836,8 +1025,15 @@ async def verify_jobs(cfg, logger, jobs, major_type: bool = True) -> List[Dict[s
                     r'.*workday\.com\/.*',
                 ]
 
+                # Log the URL being verified
+                logger.debug(f"Verifying URL: {job_url}")
+
                 # Check if URL matches any valid pattern for quick validation
                 pattern_match = any(re.search(pattern, job_url, re.IGNORECASE) for pattern in valid_patterns)
+                if pattern_match:
+                    logger.debug(f"URL pattern check passed")
+                else:
+                    logger.debug(f"URL did not match any known job URL pattern")
 
                 # Determine if we need to use the agent for verification
                 if pattern_match and not cfg.get('use_web_verify', False):
@@ -853,14 +1049,19 @@ async def verify_jobs(cfg, logger, jobs, major_type: bool = True) -> List[Dict[s
                         verify_input = f"Verify this job URL: {job_url}"
                         logger.debug(f"Using agent verification for: {job_url}")
 
-                    verify_result = await Runner.run(verifier, input=verify_input)
+                    # Run the verifier agent
+                    verify_result = await api.run_agent(verifier, verify_input)
                     verify_output = verify_result.final_output.strip().lower()
                     url_valid = verify_output == 'true'
 
-                    if url_valid:
-                        logger.debug(f"Verifier agent confirmed URL as valid")
-                    else:
-                        logger.debug(f"Verifier agent rejected URL as invalid: {verify_output}")
+                    # Track in visualizer
+                    visualizer.track_agent_call(
+                        agent_name="verifier",
+                        input_text=verify_input,
+                        output_text=verify_output,
+                        duration=0.3,  # Placeholder duration
+                        tokens_used=None
+                    )
 
                 # Update job status based on verification
                 if url_valid:

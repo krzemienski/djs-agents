@@ -1,6 +1,31 @@
 # Deep Job Search
 
-An OpenAI Agents-powered tool for finding software engineering jobs in video/streaming companies.
+An OpenAI-powered tool for finding software engineering jobs in video/streaming companies.
+
+## Using This Tool
+
+This tool provides two implementations of job search functionality:
+
+1. **Deep Job Search (default)** - A multi-agent implementation using the OpenAI Agents SDK
+2. **Response Job Search** - A simpler implementation using the OpenAI Responses API
+
+You can run either implementation using the provided scripts:
+
+```bash
+# Run the unified command script (supports both implementations)
+./run.sh
+
+# Run the default multi-agent implementation
+./run.sh
+
+# Run the simpler Responses API implementation
+./run.sh --responses
+
+# Quick sample run with minimal jobs
+./run.sh --sample
+```
+
+The tool automatically detects if Docker is available and uses it when possible for consistent execution.
 
 ## System Architecture
 
@@ -39,6 +64,45 @@ You can generate a visual representation of this architecture by running:
 ```bash
 python visualize_agents.py
 ```
+
+## Enhanced Logging and Visualization
+
+The system features an enhanced logging framework that provides:
+
+1. **Detailed API Interaction Logging**
+   - All API requests and responses are logged to a separate file
+   - Full visibility into what is sent to OpenAI and what is received
+   - Timing information for each API call
+
+2. **Visual Agent Flow Diagrams**
+   - Automatically generates visual diagrams showing agent interactions
+   - Timeline view of agent execution and handoffs
+   - Token usage visualization by agent and model
+
+3. **Hierarchical Log Structure**
+   - Nested depth-tracking for better understanding of execution flow
+   - Colored output for different log levels and API interactions
+   - Clear separation between different phases of execution
+
+4. **Comprehensive Token Usage Tracking**
+   - Detailed breakdown of token usage by phase and model
+   - Real-time budget monitoring and alerts
+   - Visualization of token consumption patterns
+
+To leverage these enhanced logging features, use the `run_with_logs.sh` script:
+
+```bash
+# Run with detailed logging and visualization
+./run_with_logs.sh
+
+# Run with web verification and detailed logs
+./run_with_logs.sh --use-web-verify
+
+# Run in sample mode with premium models
+./run_with_logs.sh --sample --premium
+```
+
+Logs and visualizations are stored in the `logs/` directory, with API interactions logged separately to `*.api.log` files.
 
 ## How It Works
 
@@ -167,34 +231,58 @@ OPENAI_API_KEY=your_api_key_here
 ### CLI Options
 
 ```
-usage: deep_job_search.py [-h] [--majors MAJORS] [--startups STARTUPS]
-                         [--planner-model PLANNER_MODEL]
-                         [--search-model SEARCH_MODEL]
-                         [--verifier-model VERIFIER_MODEL]
-                         [--log-level LOG_LEVEL] [--log-file LOG_FILE]
-                         [--max-tokens MAX_TOKENS] [--force] [--budget BUDGET]
-                         [--sample] [--use-web-verify] [--trace]
+usage: run.sh [options]
+or:    ./build-and-run.sh [options]
+or:    python deep_job_search.py [options]
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --majors MAJORS       Number of major company jobs to find (default: 100)
-  --startups STARTUPS   Number of startup jobs to find (default: 100)
-  --planner-model PLANNER_MODEL
-                        Model for planning (default: gpt-4.1)
-  --search-model SEARCH_MODEL
-                        Model for search/processing (default: gpt-4o-mini)
-  --verifier-model VERIFIER_MODEL
-                        Model for verification (default: o3)
-  --log-level LOG_LEVEL
-                        Logging level (default: INFO)
-  --log-file LOG_FILE   Log to this file in addition to console
-  --max-tokens MAX_TOKENS
-                        Maximum tokens to use (default: 100000)
+Main options:
+  --help                show this help message and exit
+  --majors MAJORS       Number of major company jobs to find
+  --startups STARTUPS   Number of startup jobs to find
+  --sample              Run with minimal settings (10 major, 10 startup jobs)
+  --log-level LEVEL     Logging level (default: INFO)
+  --log-file FILE       Log to this file in addition to console
   --force               Skip cost confirmation prompt
-  --budget BUDGET       Maximum cost in USD (will estimate and exit if exceeded)
-  --sample              Run with minimal settings (10 major, 10 startup jobs) for testing
-  --use-web-verify      Use web search for URL verification (slower but more accurate)
+  --budget BUDGET       Maximum cost in USD (exit if exceeded)
+  --use-web-verify      Use web search for URL verification
+
+Implementation options:
+  --responses           Use OpenAI Responses API implementation (simpler alternative)
+  --no-docker           Force running with Python directly (no Docker)
+  --rebuild             Force rebuild Docker image before running
+
+Model options:
+  --planner-model NAME  Model for planning (default: gpt-4.1)
+  --search-model NAME   Model for search/processing (default: gpt-4o-mini)
+  --verifier-model NAME Model for verification (default: o3)
+  --cheap               Use lowest-cost model combination
+  --premium             Use highest-quality model combination
+
+Advanced options:
+  --max-tokens MAX      Maximum tokens to use (default: 100000)
   --trace               Enable detailed agent tracing for debugging
+```
+
+### Simple CLI Examples
+
+```bash
+# Run with default settings (multi-agent implementation in Docker)
+./run.sh
+
+# Run the simpler Responses API implementation
+./run.sh --responses
+
+# Quick sample run with few jobs
+./run.sh --sample
+
+# Run with highest quality models
+./run.sh --premium
+
+# Run without Docker (directly with Python)
+./run.sh --no-docker
+
+# Debug level logging with full tracing
+./run.sh --trace --log-level DEBUG
 ```
 
 ### Run with Python
@@ -215,31 +303,34 @@ python deep_job_search.py --planner-model gpt-4o --search-model gpt-3.5-turbo
 
 ### Run with Docker
 
-Build and run using the provided script:
+The application is designed to run in Docker for consistent execution:
 
 ```bash
-# Make the script executable
-chmod +x build-and-run.sh
+# Run the unified Docker command (recommended approach)
+./run.sh
 
-# Run with default settings
+# Use the traditional build-and-run script (same functionality)
 ./build-and-run.sh
 
-# Quick, low-cost sample run
-./build-and-run.sh --quick
+# Run the simpler Responses API implementation in Docker
+./run.sh --responses
 
-# Run with lowest-cost models
-./build-and-run.sh --cheap
-
-# Run with custom arguments
-./build-and-run.sh --custom "--majors 10 --startups 10 --log-level DEBUG"
+# Force rebuild the Docker image before running
+./run.sh --rebuild
 ```
+
+All Docker runs automatically:
+- Mount local directories for logs and results to persist data
+- Pass your OPENAI_API_KEY from the environment
+- Manage filesystem permissions for generated files
+- Configure logging and visualization appropriately
 
 ## Output
 
 Results are saved in the `results` directory:
 
-- `deep_job_results.csv` - CSV format suitable for spreadsheet applications
-- `deep_job_results.md` - Markdown format for easy viewing on GitHub
+- `deep_job_results.csv` or `responses_job_results.csv` - CSV format suitable for spreadsheet applications
+- `deep_job_results.md` or `responses_job_results.md` - Markdown format for easy viewing on GitHub
 
 Each result includes:
 - Job number (#)
@@ -591,8 +682,13 @@ Deep Job Search offers two different implementation approaches:
 The primary implementation uses the OpenAI Agents SDK, which provides:
 - Fine-grained control over each agent's behavior
 - Detailed token usage monitoring and budgeting
-- More explicit error handling and fallback mechanisms
-- Support for agent visualization (see [Advanced Features](#advanced-features))
+- Extensive logging and visualization of agent interactions
+- More robust error handling and verification steps
+
+**Best for:**
+- When you need detailed control over the search process
+- When visualization of agent interactions is desired
+- When you want to track token usage and costs in detail
 
 ```bash
 # Run the Agents SDK implementation (default)
@@ -603,16 +699,23 @@ python deep_job_search.py --majors 20 --startups 20
 
 An alternative implementation using the newer OpenAI Responses API is also provided, which offers:
 - Simplified code with fewer moving parts
-- Single API call instead of multiple round trips
-- Stateful conversation handling by the API
-- Less complex error handling
+- Faster execution with fewer API calls
+- Easier to understand and modify
+- Lower overall token usage for similar results
+
+**Best for:**
+- Quick job searches with less complexity
+- Lower-cost operations when token efficiency matters
+- Simple modifications and extensions to the codebase
+
+**How to Choose:**
+- For maximum control and visualization: Use Deep Job Search (default)
+- For simplicity and efficiency: Use Responses Job Search (`--responses` flag)
 
 ```bash
 # Run the Responses API implementation
 python responses_job_search.py --majors 5 --startups 5 --model gpt-4o
 ```
-
-The Responses API implementation is simpler but currently offers less fine-grained control over token usage and less detailed error handling. It's a good option for simpler use cases or when you need to minimize code complexity.
 
 ## Debugging and Tracing
 
@@ -638,3 +741,49 @@ This is extremely helpful for:
 - Identifying performance bottlenecks
 
 Tracing output appears in the console by default.
+
+## Implementation Comparison
+
+This project offers two different implementations for job search functionality, each with distinct advantages:
+
+### 1. Deep Job Search (Agents SDK)
+
+**File:** `deep_job_search.py`
+
+**Benefits:**
+- Fine-grained control with specialized agents for each task phase
+- Detailed token usage tracking and budget management
+- Extensive logging and visualization of agent interactions
+- More robust error handling and verification steps
+
+**Best for:**
+- When you need detailed control over the search process
+- When visualization of agent interactions is desired
+- When you want to track token usage and costs in detail
+
+### 2. Responses Job Search (Responses API)
+
+**File:** `responses_job_search.py`
+
+**Benefits:**
+- Simpler implementation with less code
+- Faster execution with fewer API calls
+- Easier to understand and modify
+- Lower overall token usage for similar results
+
+**Best for:**
+- Quick job searches with less complexity
+- Lower-cost operations when token efficiency matters
+- Simple modifications and extensions to the codebase
+
+**How to Choose:**
+- For maximum control and visualization: Use Deep Job Search (default)
+- For simplicity and efficiency: Use Responses Job Search (`--responses` flag)
+
+```bash
+# Deep Job Search (default, with visualization)
+./run.sh
+
+# Responses API (simpler alternative)
+./run.sh --responses
+```

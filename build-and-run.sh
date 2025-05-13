@@ -13,9 +13,9 @@ if [ -z "$OPENAI_API_KEY" ]; then
     exit 1
 fi
 
-# Create output directory
-echo "🔹 Creating output directory..."
-mkdir -p results
+# Create output directories
+echo "🔹 Creating output directories..."
+mkdir -p results logs/visuals
 
 # Function to display help message
 show_help() {
@@ -154,19 +154,24 @@ else
 fi
 
 # Prepare run command and arguments
-RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v $(pwd)/results:/app/output jobbot"
+RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -e RUNNING_IN_CONTAINER=1"
+RUN_CMD+=" -v $(pwd)/logs:/app/logs -v $(pwd)/results:/app/results jobbot"
 
 # Handle special execution modes
 if $VISUALIZE_MODE; then
     echo "🔹 Running in visualization mode"
     # Override the entrypoint to run the visualization script
-    RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v $(pwd)/results:/app/output --entrypoint python jobbot visualize_agents.py"
+    RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -e RUNNING_IN_CONTAINER=1"
+    RUN_CMD+=" -v $(pwd)/logs:/app/logs -v $(pwd)/results:/app/results"
+    RUN_CMD+=" --entrypoint python jobbot visualize_agents.py"
     # Remove any custom args that might conflict
     CUSTOM_ARGS=""
 elif $RESPONSES_MODE; then
     echo "🔹 Running with Responses API implementation"
     # Override the entrypoint to run the responses script
-    RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -v $(pwd)/results:/app/output --entrypoint python jobbot responses_job_search.py"
+    RUN_CMD="docker run --rm -e OPENAI_API_KEY=$OPENAI_API_KEY -e RUNNING_IN_CONTAINER=1"
+    RUN_CMD+=" -v $(pwd)/logs:/app/logs -v $(pwd)/results:/app/results"
+    RUN_CMD+=" --entrypoint python jobbot responses_job_search.py"
 fi
 
 # Add appropriate arguments based on options
