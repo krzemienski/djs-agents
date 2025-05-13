@@ -980,3 +980,337 @@
 2025-05-13 20:22:32 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
 2025-05-13 20:22:32 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find kubernetes jobs at Google (Major) with web search. Search query: Google kubernetes jobs careers...[0m
 2025-05-13 20:22:32 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 35.01s[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings extracted did not yield any structured data. However, here are the details of the Kubernetes-related job openings at Google:
+
+1. **Software Engineer, Google Kubernetes Engine**
+   - **Location:** Warsaw, Poland
+   - **Responsibilities:** Design and implement networking features in Kubernetes and GKE, develop network virtualization solutions, assist customers, and engage with the open-source community.
+   - **Minimum Qualifications:** Bachelor's degree, 2 years of s...[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 35.02s[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings extracted did not yield any structured data. However, here are the details of the Kubernetes-related job openings at Google:
+
+1. **Software Engineer, Google Kubernetes Engine**
+   - **Location:** Warsaw, Poland
+   - **Responsibilities:** Design and implement networking features in Kubernetes and GKE, develop network virtualization solutions, assist customers, and engage with the open-source community.
+   - **Minimum Qualifications:** Bachelor's degree, 2 years of s...[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:23:07 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings extracted did not yield any structu...[0m
+2025-05-13 20:23:07 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 3.59s[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: ```json
+[
+  {
+    "title": "Software Engineer, Google Kubernetes Engine",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/126166322416362182-software-engineer-google-kubernetes-engine?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Senior Software Engineer, Google Kubernetes Engine",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/109365939228549830-senior-software-engineer/?utm...[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 3.59s[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:762 - [37m    Processor output: ```json
+[
+  {
+    "title": "Software Engineer, Google Kubernetes Engine",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/126166322416362182-software-engineer-google-kubernetes-engine?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Senior Software Engineer, Google Kubernetes Engine",
+    "company": "Google",
+    "url": "https://www.google.com/about/careers/applications/jobs/results/109365939228549830-senior-software-engineer/?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Software Engineering Manager II, Google Kubernetes Engine",
+    "company": "Google",
+    "url": "https://www.jointaro.com/jobs/google/software-engineering-manager-ii-google-kubernetes-engine-bbf04950/?utm_source=openai",
+    "type": "Major"
+  }
+]
+```[0m
+2025-05-13 20:23:10 [INFO] jobbot.gather:842 - [34m    Found 3 potential job listings for Google[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:868 - [37m    Job 1: Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineer, Google Kubernetes Engine[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:868 - [37m    Job 2: Senior Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:880 - [37m    Added major job: Senior Software Engineer, Google Kubernetes Engine[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:868 - [37m    Job 3: Software Engineering Manager II, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineering Manager II, Google Kubernetes Engine[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Google-kubernetes in 38.62s[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:10 [INFO] jobbot.gather:726 - [34m  Search 10/40: video jobs at Meta (Major)[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:729 - [37m  Search query: Meta video jobs careers software engineering apply[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Search: Meta-video[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.gather:737 - [37m    Executing web search via gpt-4o-mini model[0m
+2025-05-13 20:23:10 [INFO] jobbot.run_agent:87 - [34m    Running agent 'searcher'[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Find video jobs at Meta (Major) with web search. Search query: Meta video jobs careers software engi...[0m
+2025-05-13 20:23:10 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: searcher[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 31.69s[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: It seems that the job listings extracted did not yield any structured data. However, I can summarize the key positions found:
+
+1. **Software Engineer, Video Codec - Reality Labs**
+   - **Location:** Sunnyvale, CA
+   - **Responsibilities:** Develop and troubleshoot video/audio codecs, collaborate with teams, optimize video quality.
+   - **Qualifications:** 5+ years in software development, experience in video processing, C/C++ programming.
+   - **Compensation:** $70.67/hour to $208,000/year.
+   -...[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: searcher in 31.69s[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.gather:744 - [37m    Search result: It seems that the job listings extracted did not yield any structured data. However, I can summarize the key positions found:
+
+1. **Software Engineer, Video Codec - Reality Labs**
+   - **Location:** Sunnyvale, CA
+   - **Responsibilities:** Develop and troubleshoot video/audio codecs, collaborate with teams, optimize video quality.
+   - **Qualifications:** 5+ years in software development, experience in video processing, C/C++ programming.
+   - **Compensation:** $70.67/hour to $208,000/year.
+   -...[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.gather:757 - [37m    Processing search results via gpt-4o-mini model[0m
+2025-05-13 20:23:42 [INFO] jobbot.run_agent:87 - [34m    Running agent 'processor'[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.run_agent:88 - [37m    Agent input: Process these job search results: It seems that the job listings extracted did not yield any structu...[0m
+2025-05-13 20:23:42 [DEBUG] jobbot.__enter__:318 - [37m    ▶ STARTED: Agent Run: processor[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.run_agent:100 - [37m      Agent completed in 7.12s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.run_agent:105 - [37m      Agent output: ```json
+[
+  {
+    "title": "Software Engineer, Video Codec - Reality Labs",
+    "company": "Meta",
+    "url": "https://jobs.accel.com/companies/facebook-2-07d2eb1b-d3ad-4084-93df-74a124ac9233/jobs/47550858-software-engineer-video-codec-reality-labs?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Software Engineering Manager, Media (Video/Audio)",
+    "company": "Meta",
+    "url": "https://www.mediabistro.com/jobs/590747382-meta-is-hiring-software-engineering-manager-media-video-au...[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m    ✓ COMPLETED: Agent Run: processor in 7.12s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:762 - [37m    Processor output: ```json
+[
+  {
+    "title": "Software Engineer, Video Codec - Reality Labs",
+    "company": "Meta",
+    "url": "https://jobs.accel.com/companies/facebook-2-07d2eb1b-d3ad-4084-93df-74a124ac9233/jobs/47550858-software-engineer-video-codec-reality-labs?utm_source=openai",
+    "type": "Major"
+  },
+  {
+    "title": "Software Engineering Manager, Media (Video/Audio)",
+    "company": "Meta",
+    "url": "https://www.mediabistro.com/jobs/590747382-meta-is-hiring-software-engineering-manager-media-video-audio-in-menlo-park?utm_source=openai",
+    "type": "Major"
+  }
+]
+```[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:842 - [34m    Found 2 potential job listings for Meta[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:868 - [37m    Job 1: Software Engineer, Video Codec - Reality Labs at Meta[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineer, Video Codec - Reality Labs[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:868 - [37m    Job 2: Software Engineering Manager, Media (Video/Audio) at Meta[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:880 - [37m    Added major job: Software Engineering Manager, Media (Video/Audio)[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Search: Meta-video in 38.82s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Meta (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Meta (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Microsoft (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Microsoft (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Microsoft (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Netflix (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Netflix (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Netflix (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping NVIDIA (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping NVIDIA (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping NVIDIA (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping OpenAI (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping OpenAI (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping OpenAI (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Anthropic (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Anthropic (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Anthropic (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Disney (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Disney (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Disney (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Hulu (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Hulu (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Hulu (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping TikTok (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping TikTok (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping TikTok (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Snap (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Snap (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Snap (Major) - major quota reached[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'search' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.gather:720 - [37m  Skipping Zoom (Major) - major quota reached[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:478 - [34m  Phase 'search' token usage: 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:480 - [34m  Phase 'search' API calls: 10[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:483 - [34m  Current token usage by model:[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:514 - [34m  Token usage details not available from API[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:520 - [34m  Total usage: 0/100,000 tokens (0.0%, $0.0000)[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:526 - [34m  Total API calls: 21[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - plan: 1 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - search: 10 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - process: 10 calls[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:898 - [34m  Search phase complete - Successes: 10, Failures: 0[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:899 - [34m  Jobs found - Major: 11, Startup: 0[0m
+2025-05-13 20:23:49 [INFO] jobbot.__exit__:326 - [34m✓ COMPLETED: Search Phase in 311.41s[0m
+2025-05-13 20:23:49 [INFO] jobbot.__enter__:318 - [34m▶ STARTED: Verification Phase[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:903 - [34m  Verifying up to 11 major jobs and 0 startup jobs[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:957 - [34m  Verifying 10 major company job URLs[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:970 - [37m  Initializing verifier with model o3, web search: False[0m
+2025-05-13 20:23:49 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'verifier' with model: o3[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: verifier[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: verifier in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 1/10: Video Codec Engineering Manager at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Apple-Video Codec Engineering Manager[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.themuse.com/jobs/apple/video-codec-engineering-manager-31b5e9?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.themuse.com/jobs/apple/video-codec-engineering-manager-31b5e9?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Video Codec Engineering Manager at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Apple-Video Codec Engineering Manager in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 2/10: Software Engineering Manager - Media Processing at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Apple-Software Engineering Manager - Media Processing[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.themuse.com/jobs/apple/software-engineering-manager-media-processing?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.themuse.com/jobs/apple/software-engineering-manager-media-processing?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Software Engineering Manager - Media Processing at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Apple-Software Engineering Manager - Media Processing in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 3/10: Silicon Validation Software Engineer: Video Encoder/Compression Validation at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Apple-Silicon Validation Software Engineer: Video Encoder/Compression Validation[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.themuse.com/jobs/apple/silicon-validation-software-engineer-video-encodercompression-validation-e77232?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.themuse.com/jobs/apple/silicon-validation-software-engineer-video-encodercompression-validation-e77232?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Silicon Validation Software Engineer: Video Encoder/Compression Validation at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Apple-Silicon Validation Software Engineer: Video Encoder/Compression Validation in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 4/10: Video Codec Algorithm Engineer at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Apple-Video Codec Algorithm Engineer[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.themuse.com/jobs/apple/video-codec-algorithm-engineer-074b5f?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.themuse.com/jobs/apple/video-codec-algorithm-engineer-074b5f?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Video Codec Algorithm Engineer at Apple[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Apple-Video Codec Algorithm Engineer in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 5/10: Software Engineer III, Infrastructure, Google TV at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Google-Software Engineer III, Infrastructure, Google TV[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.google.com/about/careers/applications/jobs/results/115652162783978182-software-engineer-iii/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.google.com/about/careers/applications/jobs/results/115652162783978182-software-engineer-iii/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Software Engineer III, Infrastructure, Google TV at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Google-Software Engineer III, Infrastructure, Google TV in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 6/10: Video Streaming Specialist, gTech Professional Services at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Google-Video Streaming Specialist, gTech Professional Services[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.google.com/about/careers/applications/jobs/results/122601961403884230-video-streaming-specialists/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.google.com/about/careers/applications/jobs/results/122601961403884230-video-streaming-specialists/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Video Streaming Specialist, gTech Professional Services at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Google-Video Streaming Specialist, gTech Professional Services in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 7/10: Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Google-Software Engineer, Google Kubernetes Engine[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.google.com/about/careers/applications/jobs/results/126166322416362182-software-engineer-google-kubernetes-engine?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.google.com/about/careers/applications/jobs/results/126166322416362182-software-engineer-google-kubernetes-engine?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Google-Software Engineer, Google Kubernetes Engine in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 8/10: Senior Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Google-Senior Software Engineer, Google Kubernetes Engine[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.google.com/about/careers/applications/jobs/results/109365939228549830-senior-software-engineer/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.google.com/about/careers/applications/jobs/results/109365939228549830-senior-software-engineer/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Senior Software Engineer, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Google-Senior Software Engineer, Google Kubernetes Engine in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 9/10: Software Engineering Manager II, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Google-Software Engineering Manager II, Google Kubernetes Engine[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://www.jointaro.com/jobs/google/software-engineering-manager-ii-google-kubernetes-engine-bbf04950/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://www.jointaro.com/jobs/google/software-engineering-manager-ii-google-kubernetes-engine-bbf04950/?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Software Engineering Manager II, Google Kubernetes Engine at Google[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Google-Software Engineering Manager II, Google Kubernetes Engine in 0.00s[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.check_budget:421 - [37m  Phase 'verify' token usage updated: +0 tokens, now 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1003 - [34m  Verifying Major job 10/10: Software Engineer, Video Codec - Reality Labs at Meta[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Verify: Meta-Software Engineer, Video Codec - Reality Labs[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1029 - [37m    Verifying URL: https://jobs.accel.com/companies/facebook-2-07d2eb1b-d3ad-4084-93df-74a124ac9233/jobs/47550858-software-engineer-video-codec-reality-labs?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1034 - [37m    URL pattern check passed[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1042 - [37m    URL pattern check passed for: https://jobs.accel.com/companies/facebook-2-07d2eb1b-d3ad-4084-93df-74a124ac9233/jobs/47550858-software-engineer-video-codec-reality-labs?utm_source=openai[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:1071 - [37m    Verified job: Software Engineer, Video Codec - Reality Labs at Meta[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Verify: Meta-Software Engineer, Video Codec - Reality Labs in 0.00s[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1082 - [34m  Major verification results - Success: 10, Failed: 0[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:957 - [34m  Verifying 0 startup company job URLs[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.verify_jobs:970 - [37m  Initializing verifier with model o3, web search: False[0m
+2025-05-13 20:23:49 [INFO] jobbot.create_agent:58 - [34m  Creating agent 'verifier' with model: o3[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m  ▶ STARTED: Agent Initialization: verifier[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m  ✓ COMPLETED: Agent Initialization: verifier in 0.00s[0m
+2025-05-13 20:23:49 [INFO] jobbot.verify_jobs:1082 - [34m  Startup verification results - Success: 0, Failed: 0[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:478 - [34m  Phase 'verify' token usage: 0 tokens[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:483 - [34m  Current token usage by model:[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:514 - [34m  Token usage details not available from API[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:520 - [34m  Total usage: 0/100,000 tokens (0.0%, $0.0000)[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:526 - [34m  Total API calls: 21[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - plan: 1 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - search: 10 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m    - process: 10 calls[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:911 - [34m  Verification complete - Major: 10, Startup: 0[0m
+2025-05-13 20:23:49 [INFO] jobbot.__exit__:326 - [34m✓ COMPLETED: Verification Phase in 0.01s[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:914 - [34mFinal token usage report:[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:483 - [34mCurrent token usage by model:[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:514 - [34mToken usage details not available from API[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:520 - [34mTotal usage: 0/100,000 tokens (0.0%, $0.0000)[0m
+2025-05-13 20:23:49 [INFO] jobbot.log_usage:526 - [34mTotal API calls: 21[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m  - plan: 1 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m  - search: 10 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.log_usage:529 - [37m  - process: 10 calls[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__enter__:318 - [37m▶ STARTED: Generating visualizations[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:326 - [37m✓ COMPLETED: Generating visualizations in 0.08s[0m
+2025-05-13 20:23:49 [ERROR] jobbot.__exit__:329 - [31mERROR in Generating visualizations: 'verifier'[0m
+2025-05-13 20:23:49 [DEBUG] jobbot.__exit__:330 - [37mTraceback: Traceback (most recent call last):
+  File "/app/deep_job_search.py", line 921, in gather
+    timeline_diagram = visualizer.generate_timeline_diagram(title="Job Search Timeline")
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/agent_visualizer.py", line 247, in generate_timeline_diagram
+    (time_point, agent_positions[to_agent]),
+                 ~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'verifier'
+[0m
+2025-05-13 20:23:49 [ERROR] jobbot.gather:929 - [31mError generating visualizations: 'verifier'[0m
+2025-05-13 20:23:49 [INFO] jobbot.gather:938 - [34mFinal results: 10 total jobs found (10 major, 0 startup)[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1086 - [34mSaving 10 job results to CSV and Markdown[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1101 - [34mCompany distribution in results: {'Google': 5, 'Apple': 4, 'Meta': 1}[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1104 - [34mType distribution in results: {'Major': 10}[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1117 - [34mResults saved to:[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1118 - [34m  - CSV: /app/deep_job_search/deep_job_results.csv[0m
+2025-05-13 20:23:49 [INFO] jobbot.save:1119 - [34m  - Markdown: /app/deep_job_search/deep_job_results.md[0m
+2025-05-13 20:23:49 [INFO] jobbot.main:1232 - [34mExecution completed in 326.0s[0m
+2025-05-13 20:23:49 [INFO] jobbot.main:1233 - [34mFound 10 roles (10 major target, 10 startup target)[0m

@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, Union
 import inspect
 from functools import wraps
 import traceback
+import threading
 
 # ANSI color codes for terminal output
 COLORS = {
@@ -30,6 +31,17 @@ LOG_COLORS = {
     "ERROR": COLORS["RED"],
     "CRITICAL": COLORS["RED"] + COLORS["BOLD"]
 }
+
+# Thread-local storage for tracking call depth
+_context = threading.local()
+_context.depth = 0
+_context.indent = '  '
+
+# Get terminal width for better formatting
+try:
+    terminal_width = os.get_terminal_size().columns
+except (AttributeError, OSError):
+    terminal_width = 80
 
 class APILogFormatter(logging.Formatter):
     """Custom formatter that handles API request/response logging with colors"""

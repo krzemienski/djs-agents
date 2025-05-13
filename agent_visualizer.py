@@ -10,7 +10,8 @@ from typing import Dict, List, Any, Optional, Tuple
 class AgentVisualizer:
     """
     Utility for visualizing agent interactions and API calls.
-    Generates visual diagrams showing the flow of information between agents.
+    Generates visual diagrams showing the flow of information between components.
+    Still works with the Responses API implementation by tracking steps rather than agent interactions.
     """
 
     def __init__(self, log_dir=None):
@@ -38,10 +39,10 @@ class AgentVisualizer:
 
     def track_agent_call(self, agent_name, input_text, output_text, duration, tokens_used=None):
         """
-        Track an agent call
+        Track an agent call or component step
 
         Args:
-            agent_name: Name of the agent
+            agent_name: Name of the agent or component
             input_text: Input text to the agent
             output_text: Output text from the agent
             duration: Duration of the call in seconds
@@ -83,11 +84,11 @@ class AgentVisualizer:
 
     def track_handoff(self, from_agent, to_agent, input_text):
         """
-        Track an agent handoff
+        Track an information handoff between components
 
         Args:
-            from_agent: Name of the agent handing off
-            to_agent: Name of the agent receiving the handoff
+            from_agent: Name of the component sending information
+            to_agent: Name of the component receiving the information
             input_text: Text passed in the handoff
         """
         self.handoffs.append({
@@ -97,25 +98,25 @@ class AgentVisualizer:
             'text_length': len(input_text)
         })
 
-    def generate_flow_diagram(self, title="Agent Interaction Flow", output_file=None):
+    def generate_flow_diagram(self, title="Component Interaction Flow", output_file=None):
         """
-        Generate a flow diagram showing agent interactions
+        Generate a flow diagram showing component interactions
 
         Args:
             title: Title for the diagram
-            output_file: Output file path (default: logs/visuals/agent_flow_{timestamp}.png)
+            output_file: Output file path (default: logs/visuals/flow_{timestamp}.png)
 
         Returns:
             Path to the generated diagram
         """
         if not output_file:
             timestamp = int(time.time())
-            output_file = self.log_dir / f"agent_flow_{timestamp}.png"
+            output_file = self.log_dir / f"flow_{timestamp}.png"
 
         # Create a directed graph
         G = nx.DiGraph()
 
-        # Add nodes for each agent (deduplicate)
+        # Add nodes for each component (deduplicate)
         agents = set()
         for call in self.agent_calls:
             agents.add(call['agent'])
@@ -182,9 +183,9 @@ class AgentVisualizer:
 
         return output_file
 
-    def generate_timeline_diagram(self, title="Agent Execution Timeline", output_file=None):
+    def generate_timeline_diagram(self, title="Execution Timeline", output_file=None):
         """
-        Generate a timeline diagram showing when agents were called
+        Generate a timeline diagram showing when components were called
 
         Args:
             title: Title for the diagram
@@ -195,9 +196,9 @@ class AgentVisualizer:
         """
         if not output_file:
             timestamp = int(time.time())
-            output_file = self.log_dir / f"agent_timeline_{timestamp}.png"
+            output_file = self.log_dir / f"timeline_{timestamp}.png"
 
-        # Get all agent names
+        # Get all component names
         agent_names = set()
         for call in self.agent_calls:
             agent_names.add(call['agent'])
@@ -205,7 +206,7 @@ class AgentVisualizer:
         # Create figure
         fig, ax = plt.subplots(figsize=(15, 8))
 
-        # Assign y-positions to agents
+        # Assign y-positions to components
         agent_positions = {agent: i for i, agent in enumerate(sorted(agent_names))}
 
         # Set the first call time as time zero
@@ -214,7 +215,7 @@ class AgentVisualizer:
         else:
             t0 = time.time()
 
-        # Draw timeline bars for each agent call
+        # Draw timeline bars for each component call
         colors = plt.cm.tab10.colors
 
         for i, call in enumerate(sorted(self.agent_calls, key=lambda x: x['timestamp'])):
@@ -282,7 +283,7 @@ class AgentVisualizer:
         """
         if not output_file:
             timestamp = int(time.time())
-            output_file = self.log_dir / f"agent_report_{timestamp}.json"
+            output_file = self.log_dir / f"report_{timestamp}.json"
 
         report = {
             'timestamp': time.time(),
@@ -291,7 +292,7 @@ class AgentVisualizer:
             'handoffs': self.handoffs,
             'token_usage': self.token_usage,
             'summary': {
-                'total_agents': len(set(call['agent'] for call in self.agent_calls)),
+                'total_components': len(set(call['agent'] for call in self.agent_calls)),
                 'total_calls': len(self.agent_calls),
                 'total_handoffs': len(self.handoffs),
                 'total_api_calls': len(self.api_calls),
