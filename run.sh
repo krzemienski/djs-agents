@@ -1,7 +1,7 @@
 #!/bin/bash
 # ---------------------------------------------------------------
-# run.sh - Unified command to run Deep Job Search with optional Docker
+# run.sh - Simple alias to build-and-run.sh for backward compatibility
 # ---------------------------------------------------------------
 
-# Execute the run_with_logs.sh script with all arguments passed through
-./run_with_logs.sh "$@"
+# Execute the build-and-run.sh script with all arguments passed through
+./build-and-run.sh "$@"
