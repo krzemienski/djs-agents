@@ -370,7 +370,7 @@ def search_jobs_with_responses(query, model, logger):
     # Parse the response
     return parse_responses_output(response, logger)
 
-def search_companies_with_responses(company_type, companies, count, model, logger):
+def search_companies_with_responses(company_type, companies, count, model, logger, limit=None):
     """
     Unified search function for both major and startup companies
 
@@ -380,11 +380,12 @@ def search_companies_with_responses(company_type, companies, count, model, logge
         count: Number of jobs to search for
         model: Model to use for search
         logger: Logger instance
+        limit: Limit for company list formatting (optional)
 
     Returns:
         List of job dictionaries
     """
-    companies_text = format_company_list(companies)
+    companies_text = format_company_list(companies, limit)
     keywords = ", ".join(KEYWORDS[:5])
 
     logger.info(f"Searching for {count} jobs at {company_type.lower()} companies using Responses API")
@@ -408,13 +409,13 @@ def search_companies_with_responses(company_type, companies, count, model, logge
 
     return search_jobs_with_responses(query, model, logger)
 
-def search_major_companies_with_responses(count, model, logger):
+def search_major_companies_with_responses(count, model, logger, limit=None):
     """Search for jobs at major companies using Responses API"""
-    return search_companies_with_responses("Major", MAJOR_COMPANIES, count, model, logger)
+    return search_companies_with_responses("Major", MAJOR_COMPANIES, count, model, logger, limit)
 
-def search_startup_companies_with_responses(count, model, logger):
+def search_startup_companies_with_responses(count, model, logger, limit=None):
     """Search for jobs at startup companies using Responses API"""
-    return search_companies_with_responses("Startup", STARTUP_COMPANIES, count, model, logger)
+    return search_companies_with_responses("Startup", STARTUP_COMPANIES, count, model, logger, limit)
 
 def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
     """
@@ -477,12 +478,16 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
     major_jobs = []
     startup_jobs = []
 
+    # Get company list limit
+    company_list_limit = cfg.get('company_list_limit', 10)
+
     with Timer("Overall job search", logger):
         if cfg['majors'] > 0:
             major_jobs = search_major_companies_with_responses(
                 count=cfg['majors'],
                 model=model,
-                logger=logger
+                logger=logger,
+                limit=company_list_limit
             )
             logger.info(f"Found {len(major_jobs)} major company jobs")
 
@@ -494,7 +499,8 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
             startup_jobs = search_startup_companies_with_responses(
                 count=cfg['startups'],
                 model=model,
-                logger=logger
+                logger=logger,
+                limit=company_list_limit
             )
             logger.info(f"Found {len(startup_jobs)} startup jobs")
 
@@ -602,6 +608,8 @@ def parse():
                         help="Generate visualization diagrams (default: True)")
     parser.add_argument("--no-visualize", action="store_false", dest="visualize",
                         help="Disable visualization generation")
+    parser.add_argument("--company-list-limit", type=int, default=10,
+                        help="Maximum number of companies to list in prompts (default: 10)")
 
     # No legacy arguments needed
 
@@ -625,6 +633,7 @@ def parse():
         'log_file': args.log_file,
         'trace': args.trace,
         'model': args.model,
+        'company_list_limit': args.company_list_limit,
     }
 
     return cfg
