@@ -13,7 +13,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any, Union
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -30,6 +30,7 @@ load_dotenv()
 # Constants and configuration
 OUTPUT_DIR = Path(__file__).with_suffix("")
 RESULTS_DIR = Path("results")  # For Docker compatibility
+DEBUG_DIR = Path("logs/debug")  # Directory for saving raw responses
 
 # Companies and keywords lists
 MAJOR_COMPANIES = [
@@ -122,6 +123,65 @@ class JobListing(BaseModel):
 
 
 # ------------- logging -------------
+def save_raw_response(response: Any, response_type: str, logger: logging.Logger) -> str:
+    """
+    Save the raw response data to a file for debugging purposes.
+
+    Args:
+        response: The response object from the API
+        response_type: Type of response (major/startup)
+        logger: Logger instance
+
+    Returns:
+        Path to the saved file
+    """
+    timestamp = int(time.time())
+
+    # Ensure debug directory exists
+    DEBUG_DIR.mkdir(exist_ok=True, parents=True)
+
+    # Create a unique filename
+    filename = DEBUG_DIR / f"raw_response_{response_type}_{timestamp}.txt"
+
+    try:
+        # Try to get the content in various ways
+        content = ""
+
+        # Save full response attributes
+        attrs = dir(response)
+        content += f"Response attributes: {attrs}\n\n"
+
+        # Try to get text attributes
+        if hasattr(response, "text"):
+            content += f"Response.text: {str(response.text)}\n\n"
+
+        if hasattr(response, "output_text"):
+            content += f"Response.output_text: {str(response.output_text)}\n\n"
+
+        # Try to get output field
+        if hasattr(response, "output") and response.output:
+            content += f"Response.output type: {type(response.output)}\n"
+            if isinstance(response.output, list):
+                for i, item in enumerate(response.output):
+                    content += f"Output[{i}] type: {type(item)}\n"
+                    if hasattr(item, "content") and isinstance(item.content, list):
+                        for j, content_item in enumerate(item.content):
+                            content += f"Output[{i}].content[{j}] type: {type(content_item)}\n"
+                            if hasattr(content_item, "text"):
+                                content += f"Output[{i}].content[{j}].text: {content_item.text[:1000]}...\n"
+                    elif hasattr(item, "content"):
+                        content += f"Output[{i}].content: {str(item.content)[:1000]}...\n"
+
+        # Write to file
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        logger.debug(f"Saved raw response to {filename}")
+        return str(filename)
+    except Exception as e:
+        logger.error(f"Error saving raw response: {e}")
+        return ""
+
 def setup_logger(level: str = "INFO", file: str | None = None) -> logging.Logger:
     """Set up the enhanced logger with improved format and API logging capabilities."""
     # Create API log file path if a main log file is provided
@@ -135,6 +195,10 @@ def setup_logger(level: str = "INFO", file: str | None = None) -> logging.Logger
 
     visuals_dir = logs_dir / "visuals"
     visuals_dir.mkdir(exist_ok=True)
+
+    # Create debug directory for raw responses
+    debug_dir = logs_dir / "debug"
+    debug_dir.mkdir(exist_ok=True)
 
     # Initialize the visualizer
     initialize_visualizer(visuals_dir)
@@ -207,19 +271,23 @@ def format_company_list(companies, limit=10):
     return ", ".join(companies)
 
 
-def parse_responses_output(response, logger):
+def parse_responses_output(response, logger, response_type="unknown"):
     """
     Parse the output from the Responses API to extract job data
 
     Args:
         response: Response object from the OpenAI Responses API
         logger: Logger instance
+        response_type: Type of response (major/startup)
 
     Returns:
         List of job dictionaries or empty list on error
     """
     try:
         with Timer("Parsing job data", logger):
+            # Save raw response for debugging
+            save_raw_response(response, response_type, logger)
+
             # Extract text from the response
             # Try different methods to get the result text based on what's available
             result_text = ""
@@ -247,7 +315,15 @@ def parse_responses_output(response, logger):
                             logger.debug("Using output_message.text")
                             result_text = output_message.text
 
-                        # If nothing worked, convert to string
+                        # If nothing worked, try direct content attribute
+                        if not result_text and hasattr(output_message, "content"):
+                            logger.debug("Using output_message.content directly")
+                            if isinstance(output_message.content, str):
+                                result_text = output_message.content
+                            else:
+                                result_text = str(output_message.content)
+
+                        # Last resort for output_message
                         if not result_text:
                             logger.debug("Using str(output_message)")
                             result_text = str(output_message)
@@ -275,6 +351,16 @@ def parse_responses_output(response, logger):
                 result_text = str(response)
 
             logger.info(f"Search returned {len(result_text)} characters of results")
+
+            # Save extracted result text to file for debugging
+            debug_file = DEBUG_DIR / f"extracted_text_{response_type}_{int(time.time())}.txt"
+            try:
+                DEBUG_DIR.mkdir(exist_ok=True, parents=True)
+                with open(debug_file, "w", encoding="utf-8") as f:
+                    f.write(result_text)
+                logger.debug(f"Saved extracted text to {debug_file}")
+            except Exception as e:
+                logger.error(f"Error saving extracted text: {e}")
 
             # Now look for job listings in the response text
             jobs = []
@@ -308,8 +394,27 @@ def parse_responses_output(response, logger):
             if not isinstance(result_text, str):
                 result_text = str(result_text)
 
-            # Look for a JSON array in the text using a safer approach
-            # Find the first '[' and last ']' characters to extract potential JSON array
+            # Try all JSON parsing methods
+
+            # Method 1: Look for complete JSON blocks using regex
+            json_pattern = r'(\[\s*\{.*?\}\s*\])'
+            json_matches = re.findall(json_pattern, result_text, re.DOTALL)
+
+            for json_str in json_matches:
+                try:
+                    potential_jobs = json.loads(json_str)
+                    if isinstance(potential_jobs, list) and len(potential_jobs) > 0:
+                        # Verify it contains job data
+                        if all(isinstance(job, dict) for job in potential_jobs):
+                            jobs.extend(potential_jobs)
+                            logger.info(f"Successfully parsed JSON array: {len(potential_jobs)} jobs found")
+                except Exception as e:
+                    logger.debug(f"Error parsing JSON match: {e}")
+
+            if jobs:
+                return jobs
+
+            # Method 2: Look for a JSON array in the text using bracket matching
             try:
                 start_idx = result_text.find("[")
                 if start_idx != -1:
@@ -338,7 +443,7 @@ def parse_responses_output(response, logger):
 
             # If no JSON found, try to parse markdown table
             table_match = re.search(
-                r"\|\s*Title\s*\|\s*Company\s*\|\s*URL\s*\|", result_text
+                r"\|\s*Title\s*\|\s*Company\s*\|\s*URL\s*\|", result_text, re.IGNORECASE
             )
             if table_match:
                 # Parse markdown table
@@ -369,9 +474,7 @@ def parse_responses_output(response, logger):
                             url = parts[3]
 
                             if "http" in url:
-                                job_type = (
-                                    "Major" if company in MAJOR_COMPANIES else "Startup"
-                                )
+                                job_type = response_type.capitalize()
                                 jobs.append(
                                     {
                                         "title": title,
@@ -383,88 +486,125 @@ def parse_responses_output(response, logger):
                 logger.info(
                     f"Successfully parsed markdown table: {len(jobs)} jobs found"
                 )
-                return jobs
+                if jobs:
+                    return jobs
+
+            # Try to find a list format with numbering
+            numbered_jobs = re.findall(r'\d+\.\s+([^:]+):\s+([^(]+)\s*\(([^)]+)\)', result_text)
+            if numbered_jobs:
+                for title, company, url in numbered_jobs:
+                    if 'http' in url:
+                        job_type = response_type.capitalize()
+                        jobs.append({
+                            "title": title.strip(),
+                            "company": company.strip(),
+                            "url": url.strip(),
+                            "type": job_type
+                        })
+                logger.info(f"Found {len(jobs)} jobs using numbered format parsing")
+                if jobs:
+                    return jobs
 
             # If parsing table fails, use regex to find potential job listings
             logger.info("Falling back to regex pattern matching for job data")
-            jobs = []
 
-            # Regex patterns for different job title formats
-            title_at_company_pattern = r"([A-Za-z\s\-–&]+) at ([A-Za-z\s\-–&]+)"
-            company_hiring_pattern = (
-                r"([A-Za-z\s\-–&]+) is hiring:?\s*([A-Za-z\s\-–&]+)"
-            )
-            url_pattern = r"(https?://[^\s]+)"
+            # Enhanced regex patterns
+            job_patterns = [
+                # Pattern 1: <title> at <company> with nearby URL
+                (r'(?P<title>[A-Za-z0-9\s\-–&,\.]+)\s+at\s+(?P<company>[A-Za-z0-9\s\-–&,\.]+)', 50),
+
+                # Pattern 2: <company> is hiring <title>
+                (r'(?P<company>[A-Za-z0-9\s\-–&,\.]+)\s+is\s+hiring:?\s*(?P<title>[A-Za-z0-9\s\-–&,\.]+)', 50),
+
+                # Pattern 3: Job: <title>, Company: <company>
+                (r'(?:Job|Title|Position):\s*(?P<title>[^,\n]+)(?:[,\n]|\s+and|\s+at)\s*(?:Company|Employer):\s*(?P<company>[^,\n]+)', 50),
+
+                # Pattern 4: <title> - <company>
+                (r'(?P<title>[A-Za-z0-9\s\-–&,\.]+)\s+-\s+(?P<company>[A-Za-z0-9\s\-–&,\.]+)', 30),
+
+                # Pattern 5: <company> - <title>
+                (r'(?P<company>[A-Za-z0-9\s\-–&,\.]+)\s+-\s+(?P<title>[A-Za-z0-9\s\-–&,\.]+)', 30)
+            ]
+
+            url_pattern = r'(https?://[^\s"\',]+)'
+            url_matches = re.findall(url_pattern, result_text)
 
             # Words to ignore as titles (false positives like action verbs)
             ignore_words = [
-                "apply",
-                "learn",
-                "more",
-                "view",
-                "click",
-                "check",
-                "see",
-                "visit",
-                "join",
+                "apply", "learn", "more", "view", "click", "check", "see", "visit", "join",
+                "next", "back", "skip", "search", "find", "contact", "home", "about", "jobs",
+                "careers", "terms", "privacy", "help", "support", "login", "sign"
             ]
 
-            # Find "<title> at <company>" matches
-            title_matches = re.findall(title_at_company_pattern, result_text)
-            url_matches = re.findall(url_pattern, result_text)
+            jobs = []
 
-            for i, (title, company) in enumerate(title_matches):
-                # Skip if the title is a common action verb (false positive)
-                if title.strip().lower() in ignore_words:
-                    continue
+            # Process each pattern
+            for pattern_tuple, proximity in job_patterns:
+                matches = re.finditer(pattern_tuple, result_text)
 
-                if i < len(url_matches):
-                    url = url_matches[i]
-                    job_type = (
-                        "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
-                    )
-                    jobs.append(
-                        {
-                            "title": title.strip(),
-                            "company": company.strip(),
-                            "url": url,
-                            "type": job_type,
-                        }
-                    )
+                for match in matches:
+                    match_dict = match.groupdict()
+                    title = match_dict.get('title', '').strip()
+                    company = match_dict.get('company', '').strip()
 
-            # Also find "<company> is hiring: <title>" matches
-            hiring_matches = re.findall(company_hiring_pattern, result_text)
-            start_idx = len(jobs)
+                    # Skip if the title is a common action verb (false positive)
+                    if title.lower() in ignore_words:
+                        continue
 
-            for i, (company, title) in enumerate(hiring_matches):
-                # Skip if the title is a common action verb (false positive)
-                if title.strip().lower() in ignore_words:
-                    continue
+                    # Find URL near this match
+                    match_pos = match.start()
 
-                if start_idx + i < len(url_matches):
-                    url = url_matches[start_idx + i]
-                    job_type = (
-                        "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
-                    )
-                    jobs.append(
-                        {
-                            "title": title.strip(),
-                            "company": company.strip(),
-                            "url": url,
-                            "type": job_type,
-                        }
-                    )
+                    # Try to find URL within proximity characters
+                    nearby_text = result_text[max(0, match_pos - proximity):min(len(result_text), match_pos + len(match.group(0)) + proximity)]
+                    nearby_urls = re.findall(url_pattern, nearby_text)
+
+                    if nearby_urls:
+                        url = nearby_urls[0]  # Take the first URL near this job listing
+                        job_type = response_type.capitalize()
+
+                        # Check if this job is already in our list (avoid duplicates)
+                        is_duplicate = False
+                        for existing_job in jobs:
+                            if (existing_job['title'].lower() == title.lower() and
+                                existing_job['company'].lower() == company.lower()):
+                                is_duplicate = True
+                                break
+
+                        if not is_duplicate:
+                            jobs.append({
+                                "title": title,
+                                "company": company,
+                                "url": url,
+                                "type": job_type,
+                                "has_apply": True
+                            })
+
+            # Last resort: Look for any URL with "job" in it
+            if not jobs:
+                job_urls = [url for url in url_matches if 'job' in url.lower() or 'career' in url.lower()]
+
+                for i, url in enumerate(job_urls):
+                    job_type = response_type.capitalize()
+                    jobs.append({
+                        "title": f"software engineering job listings",
+                        "company": f"{response_type} companies in the video",
+                        "url": url,
+                        "type": job_type,
+                        "has_apply": True
+                    })
 
             logger.info(f"Found {len(jobs)} jobs using regex pattern matching")
             return jobs
 
     except Exception as e:
         logger.error(f"Error parsing job data: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # Return empty list on error
         return []
 
 
-def search_jobs_with_responses(query, model, logger):
+def search_jobs_with_responses(query, model, logger, timeout=120):
     """
     Search for jobs using the Responses API
 
@@ -472,6 +612,7 @@ def search_jobs_with_responses(query, model, logger):
         query: Search query or instructions
         model: Model to use for the search
         logger: Logger instance
+        timeout: Maximum time in seconds to wait for response (default: 120)
 
     Returns:
         List of job dictionaries
@@ -491,7 +632,11 @@ def search_jobs_with_responses(query, model, logger):
         try:
             # Create a response with web search enabled
             response = client.responses.create(
-                model=model, input=query, tools=[{"type": "web_search"}]
+                model=model,
+                input=query,
+                tools=[{"type": "web_search"}],
+                max_output_tokens=4000,  # Ensure we get a complete response
+                timeout=timeout
             )
 
             # Record API call in visualizer
@@ -534,11 +679,13 @@ def search_jobs_with_responses(query, model, logger):
     )
 
     # Parse the response
-    return parse_responses_output(response, logger)
+    # Determine response type from query
+    response_type = "major" if "major companies" in query.lower() else "startup"
+    return parse_responses_output(response, logger, response_type)
 
 
 def search_companies_with_responses(
-    company_type, companies, count, model, logger, limit=None
+    company_type, companies, count, model, logger, limit=None, timeout=120
 ):
     """
     Unified search function for both major and startup companies
@@ -550,6 +697,7 @@ def search_companies_with_responses(
         model: Model to use for search
         logger: Logger instance
         limit: Limit for company list formatting (optional)
+        timeout: Maximum time in seconds to wait for response (default: 120)
 
     Returns:
         List of job dictionaries
@@ -572,26 +720,38 @@ def search_companies_with_responses(
     2. The company name
     3. The direct URL to the job posting (not a careers page)
 
-    Return the results as a structured JSON array with fields: title, company, url, type
-    Set the "type" field to "{company_type}" for all these companies.
+    IMPORTANT: Return the results in the following JSON format:
+    ```json
+    [
+      {{
+        "title": "Software Engineer",
+        "company": "CompanyName",
+        "url": "https://example.com/job",
+        "type": "{company_type}"
+      }},
+      ...more jobs...
+    ]
+    ```
 
-    Only include real job postings with direct application links.
+    If you cannot find enough jobs in JSON format, provide what you can find in a markdown table with columns for Title, Company, and URL.
+
+    Only include real job postings with direct application links. Use "type": "{company_type}" for all these companies.
     """
 
-    return search_jobs_with_responses(query, model, logger)
+    return search_jobs_with_responses(query, model, logger, timeout=timeout)
 
 
-def search_major_companies_with_responses(count, model, logger, limit=None):
+def search_major_companies_with_responses(count, model, logger, limit=None, timeout=120):
     """Search for jobs at major companies using Responses API"""
     return search_companies_with_responses(
-        "Major", MAJOR_COMPANIES, count, model, logger, limit
+        "Major", MAJOR_COMPANIES, count, model, logger, limit, timeout
     )
 
 
-def search_startup_companies_with_responses(count, model, logger, limit=None):
+def search_startup_companies_with_responses(count, model, logger, limit=None, timeout=120):
     """Search for jobs at startup companies using Responses API"""
     return search_companies_with_responses(
-        "Startup", STARTUP_COMPANIES, count, model, logger, limit
+        "Startup", STARTUP_COMPANIES, count, model, logger, limit, timeout
     )
 
 
@@ -674,6 +834,7 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
                 model=model,
                 logger=logger,
                 limit=company_list_limit,
+                timeout=cfg.get("timeout", 120),
             )
             logger.info(f"Found {len(major_jobs)} major company jobs")
 
@@ -687,6 +848,7 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
                 model=model,
                 logger=logger,
                 limit=company_list_limit,
+                timeout=cfg.get("timeout", 120),
             )
             logger.info(f"Found {len(startup_jobs)} startup jobs")
 
@@ -840,6 +1002,12 @@ def parse():
         default=10,
         help="Maximum number of companies to list in prompts (default: 10)",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="API call timeout in seconds (default: 120)",
+    )
 
     # No legacy arguments needed
 
@@ -864,6 +1032,7 @@ def parse():
         "trace": args.trace,
         "model": args.model,
         "company_list_limit": args.company_list_limit,
+        "timeout": args.timeout,
     }
 
     return cfg

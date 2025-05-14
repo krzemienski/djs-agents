@@ -18,6 +18,14 @@ You can run the application using the provided script:
 
 The application automatically uses Docker for consistent execution across environments.
 
+## Recent Updates
+
+- **Enhanced Response Parsing**: Improved job data extraction with more reliable regex patterns and comprehensive parsing strategies
+- **Response Debugging**: Added debug functionality that saves raw API responses and extracted text for better troubleshooting
+- **API Timeout Control**: New `--timeout` parameter allows setting maximum wait time for API responses
+- **Structured Output Enforcing**: Modified prompts to explicitly request JSON-formatted responses for better parsing
+- **Error Handling**: Enhanced error recovery and logging to better identify parsing issues
+
 ## System Architecture
 
 ```mermaid
@@ -93,6 +101,7 @@ Main options:
   --rebuild             Force rebuild of the Docker image
   --visualize           Generate visualization diagrams (default: True)
   --no-visualize        Disable visualization generation
+  --timeout SECONDS     API call timeout in seconds (default: 120)
 
 Model options:
   --model MODEL         Model for Responses API implementation (default: gpt-4o)
@@ -265,12 +274,15 @@ OPENAI_API_KEY=your_api_key_here
 ./build-and-run.sh --model gpt-4.1 --majors 15 --startups 10 --force --budget 0.25 --use-web-verify
 
 # Maximum performance run - All options with $25 budget limit
-./build-and-run.sh --model gpt-4.1 --majors 50 --startups 50 --force --budget 25.00 --log-level DEBUG --max-tokens 500000 --company-list-limit 20 --visualize --use-web-verify
+./build-and-run.sh --model gpt-4.1 --majors 50 --startups 50 --force --budget 25.00 --log-level DEBUG --max-tokens 500000 --company-list-limit 20 --visualize --use-web-verify --timeout 180
 ```
 
 ### Feature-specific Examples
 
 ```bash
+# Run with longer timeout for complex searches
+./build-and-run.sh --timeout 240
+
 # Run with budget control
 ./build-and-run.sh --budget 0.10 --force
 
@@ -326,7 +338,8 @@ JOBBOT_SKIP_CONFIRM=1 ./build-and-run.sh --model gpt-4.1 --majors 30 --startups 
   --company-list-limit 20 \
   --visualize \
   --rebuild \
-  --use-web-verify
+  --use-web-verify \
+  --timeout 180
 ```
 
 ### Logging and Debugging
@@ -460,6 +473,21 @@ If you encounter errors about model availability:
 ```bash
 # Try using a more widely available model
 ./build-and-run.sh --model gpt-4o
+```
+
+### Parser Issues
+
+If the job search is returning fewer jobs than expected:
+
+```bash
+# Use debug logging to see raw API responses
+./build-and-run.sh --log-level DEBUG
+
+# Check logs/debug directory for raw response files
+ls logs/debug/
+
+# Increase timeout for more complex searches
+./build-and-run.sh --timeout 240
 ```
 
 ### Docker Issues
