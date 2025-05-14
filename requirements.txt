@@ -1,4 +1,5 @@
 openai>=1.78.1    # Core OpenAI API
+openai-agents>=0.0.14  # OpenAI Agents Python SDK
 pydantic>=2.10,<3  # For data validation
 requests==2.31.0   # HTTP client
 beautifulsoup4==4.12.3  # For HTML parsing
