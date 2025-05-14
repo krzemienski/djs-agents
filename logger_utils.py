@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Optional
 import inspect
 from functools import wraps
 import traceback
@@ -20,7 +20,7 @@ COLORS = {
     "CYAN": "\033[36m",
     "GRAY": "\033[37m",
     "BOLD": "\033[1m",
-    "UNDERLINE": "\033[4m"
+    "UNDERLINE": "\033[4m",
 }
 
 # Log levels with colors
@@ -29,19 +29,20 @@ LOG_COLORS = {
     "INFO": COLORS["BLUE"],
     "WARNING": COLORS["YELLOW"],
     "ERROR": COLORS["RED"],
-    "CRITICAL": COLORS["RED"] + COLORS["BOLD"]
+    "CRITICAL": COLORS["RED"] + COLORS["BOLD"],
 }
 
 # Thread-local storage for tracking call depth
 _context = threading.local()
 _context.depth = 0
-_context.indent = '  '
+_context.indent = "  "
 
 # Get terminal width for better formatting
 try:
     terminal_width = os.get_terminal_size().columns
 except (AttributeError, OSError):
     terminal_width = 80
+
 
 class APILogFormatter(logging.Formatter):
     """Custom formatter that handles API request/response logging with colors"""
@@ -52,18 +53,22 @@ class APILogFormatter(logging.Formatter):
 
         # Apply color based on level
         levelname = record.levelname
-        if hasattr(record, 'color'):
+        if hasattr(record, "color"):
             color = record.color
         else:
             color = LOG_COLORS.get(levelname, COLORS["RESET"])
 
         # Format the message
-        if hasattr(record, 'api_type'):
+        if hasattr(record, "api_type"):
             api_type = record.api_type
             if api_type == "request":
-                prefix = f"{COLORS['BOLD']}{COLORS['CYAN']}API REQUEST{COLORS['RESET']} → "
+                prefix = (
+                    f"{COLORS['BOLD']}{COLORS['CYAN']}API REQUEST{COLORS['RESET']} → "
+                )
             elif api_type == "response":
-                prefix = f"{COLORS['BOLD']}{COLORS['GREEN']}API RESPONSE{COLORS['RESET']} ← "
+                prefix = (
+                    f"{COLORS['BOLD']}{COLORS['GREEN']}API RESPONSE{COLORS['RESET']} ← "
+                )
             else:
                 prefix = ""
 
@@ -84,7 +89,7 @@ class APILogFormatter(logging.Formatter):
             record.msg = f"{prefix}{record.msg}"
 
         # Apply color formatting for terminal
-        if color and not getattr(record, 'no_color', False):
+        if color and not getattr(record, "no_color", False):
             record.msg = f"{color}{record.msg}{COLORS['RESET']}"
 
         # Call the original formatter
@@ -94,10 +99,11 @@ class APILogFormatter(logging.Formatter):
         record.msg = original_msg
         return result
 
+
 class DepthTrackingFilter(logging.Filter):
     """Filter that adds depth tracking to log messages"""
 
-    def __init__(self, name=''):
+    def __init__(self, name=""):
         super().__init__(name)
         self.current_depth = 0
         self.depths = {}  # Track depths by thread
@@ -106,8 +112,8 @@ class DepthTrackingFilter(logging.Filter):
         # Add indent based on depth
         depth = self.depths.get(record.thread, 0)
         record.depth = depth
-        if not hasattr(record, 'no_indent') or not record.no_indent:
-            indent = '  ' * depth
+        if not hasattr(record, "no_indent") or not record.no_indent:
+            indent = "  " * depth
             record.msg = f"{indent}{record.msg}"
         return True
 
@@ -123,6 +129,7 @@ class DepthTrackingFilter(logging.Filter):
             thread_id = threading.current_thread().ident
         if thread_id in self.depths and self.depths[thread_id] > 0:
             self.depths[thread_id] -= 1
+
 
 class TimingLogHandler(logging.Handler):
     """Log handler that tracks timing of operations"""
@@ -146,17 +153,17 @@ class TimingLogHandler(logging.Handler):
             duration = time.time() - self.start_times[operation_name]
             if operation_name not in self.operation_stats:
                 self.operation_stats[operation_name] = {
-                    'count': 0,
-                    'total_time': 0,
-                    'min_time': float('inf'),
-                    'max_time': 0
+                    "count": 0,
+                    "total_time": 0,
+                    "min_time": float("inf"),
+                    "max_time": 0,
                 }
 
             stats = self.operation_stats[operation_name]
-            stats['count'] += 1
-            stats['total_time'] += duration
-            stats['min_time'] = min(stats['min_time'], duration)
-            stats['max_time'] = max(stats['max_time'], duration)
+            stats["count"] += 1
+            stats["total_time"] += duration
+            stats["min_time"] = min(stats["min_time"], duration)
+            stats["max_time"] = max(stats["max_time"], duration)
 
             return duration
         return None
@@ -165,15 +172,18 @@ class TimingLogHandler(logging.Handler):
         """Get current timing statistics"""
         result = {}
         for op_name, stats in self.operation_stats.items():
-            avg_time = stats['total_time'] / stats['count'] if stats['count'] > 0 else 0
+            avg_time = stats["total_time"] / stats["count"] if stats["count"] > 0 else 0
             result[op_name] = {
-                'count': stats['count'],
-                'total_time': stats['total_time'],
-                'avg_time': avg_time,
-                'min_time': stats['min_time'] if stats['min_time'] != float('inf') else 0,
-                'max_time': stats['max_time']
+                "count": stats["count"],
+                "total_time": stats["total_time"],
+                "avg_time": avg_time,
+                "min_time": (
+                    stats["min_time"] if stats["min_time"] != float("inf") else 0
+                ),
+                "max_time": stats["max_time"],
             }
         return result
+
 
 # Import threading separately to avoid issues if it's not available
 try:
@@ -185,7 +195,9 @@ except ImportError:
         def current_thread():
             class Thread:
                 ident = 0
+
             return Thread()
+
 
 class EnhancedLogger(logging.Logger):
     """Enhanced logger with API and depth tracking capabilities"""
@@ -209,8 +221,14 @@ class EnhancedLogger(logging.Logger):
         """Log an API request"""
         if self.isEnabledFor(level):
             record = self.makeRecord(
-                self.name, level, "", 0, message, (), None,
-                extra={'api_type': 'request'}
+                self.name,
+                level,
+                "",
+                0,
+                message,
+                (),
+                None,
+                extra={"api_type": "request"},
             )
             self.handle(record)
 
@@ -218,8 +236,14 @@ class EnhancedLogger(logging.Logger):
         """Log an API response"""
         if self.isEnabledFor(level):
             record = self.makeRecord(
-                self.name, level, "", 0, message, (), None,
-                extra={'api_type': 'response'}
+                self.name,
+                level,
+                "",
+                0,
+                message,
+                (),
+                None,
+                extra={"api_type": "response"},
             )
             self.handle(record)
 
@@ -240,10 +264,13 @@ class EnhancedLogger(logging.Logger):
         """Get timing statistics"""
         return self.timing_handler.get_stats()
 
-def setup_enhanced_logger(level: str = 'INFO',
-                          file: Optional[str] = None,
-                          api_log_file: Optional[str] = None,
-                          console: bool = True) -> EnhancedLogger:
+
+def setup_enhanced_logger(
+    level: str = "INFO",
+    file: Optional[str] = None,
+    api_log_file: Optional[str] = None,
+    console: bool = True,
+) -> EnhancedLogger:
     """
     Set up an enhanced logger with API request/response tracking and depth visualization.
 
@@ -260,7 +287,7 @@ def setup_enhanced_logger(level: str = 'INFO',
     logging.setLoggerClass(EnhancedLogger)
 
     # Create logger instance
-    logger = logging.getLogger('jobbot')
+    logger = logging.getLogger("jobbot")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # Remove any existing handlers
@@ -269,15 +296,12 @@ def setup_enhanced_logger(level: str = 'INFO',
 
     # Create a detailed formatter for general logs
     main_fmt = APILogFormatter(
-        '%(asctime)s [%(levelname)s] %(name)s.%(funcName)s:%(lineno)d - %(message)s',
-        '%Y-%m-%d %H:%M:%S'
+        "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s:%(lineno)d - %(message)s",
+        "%Y-%m-%d %H:%M:%S",
     )
 
     # Create a simplified formatter for API logs
-    api_fmt = APILogFormatter(
-        '%(asctime)s [API] %(message)s',
-        '%Y-%m-%d %H:%M:%S'
-    )
+    api_fmt = APILogFormatter("%(asctime)s [API] %(message)s", "%Y-%m-%d %H:%M:%S")
 
     # Console handler
     if console:
@@ -304,7 +328,7 @@ def setup_enhanced_logger(level: str = 'INFO',
         # Only log API-related messages to this handler
         class APIFilter(logging.Filter):
             def filter(self, record):
-                return hasattr(record, 'api_type')
+                return hasattr(record, "api_type")
 
         api_handler.addFilter(APIFilter())
         logger.addHandler(api_handler)
@@ -315,10 +339,11 @@ def setup_enhanced_logger(level: str = 'INFO',
 
     return logger
 
+
 class DepthContext:
     """Context manager for tracking depth in logs"""
 
-    def __init__(self, logger, label=None, log_level='DEBUG'):
+    def __init__(self, logger, label=None, log_level="DEBUG"):
         self.logger = logger
         self.label = label
         self.log_level = getattr(logging, log_level, logging.DEBUG)
@@ -335,11 +360,16 @@ class DepthContext:
         self.logger.decrease_depth()
         if self.label:
             duration = time.perf_counter() - self.start_time
-            self.logger.log(self.log_level, f"✓ COMPLETED: {self.label} in {duration:.2f}s")
+            self.logger.log(
+                self.log_level, f"✓ COMPLETED: {self.label} in {duration:.2f}s"
+            )
 
         if exc_type:
             self.logger.error(f"ERROR in {self.label}: {exc_val}")
-            self.logger.debug(f"Traceback: {''.join(traceback.format_exception(exc_type, exc_val, exc_tb))}")
+            self.logger.debug(
+                f"Traceback: {''.join(traceback.format_exception(exc_type, exc_val, exc_tb))}"
+            )
+
 
 def trace_api_calls(logger):
     """
@@ -352,6 +382,7 @@ def trace_api_calls(logger):
     Returns:
         Decorator function
     """
+
     def decorator(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -368,7 +399,7 @@ def trace_api_calls(logger):
             request_data = {
                 "function": func_name,
                 "args": str(args) if args else None,
-                "kwargs": kwargs if kwargs else None
+                "kwargs": kwargs if kwargs else None,
             }
             logger.api_request(request_data)
 
@@ -384,7 +415,9 @@ def trace_api_calls(logger):
                     response_summary = {
                         "summary": "Large response truncated",
                         "type": str(type(result)),
-                        "keys": list(result.keys()) if hasattr(result, "keys") else None
+                        "keys": (
+                            list(result.keys()) if hasattr(result, "keys") else None
+                        ),
                     }
 
                 logger.api_response(response_summary)
@@ -394,7 +427,7 @@ def trace_api_calls(logger):
                 error_data = {
                     "error": str(e),
                     "type": type(e).__name__,
-                    "function": func_name
+                    "function": func_name,
                 }
                 logger.api_response(error_data, level=logging.ERROR)
                 raise
@@ -414,7 +447,7 @@ def trace_api_calls(logger):
             request_data = {
                 "function": func_name,
                 "args": str(args) if args else None,
-                "kwargs": kwargs if kwargs else None
+                "kwargs": kwargs if kwargs else None,
             }
             logger.api_request(request_data)
 
@@ -430,7 +463,9 @@ def trace_api_calls(logger):
                     response_summary = {
                         "summary": "Large response truncated",
                         "type": str(type(result)),
-                        "keys": list(result.keys()) if hasattr(result, "keys") else None
+                        "keys": (
+                            list(result.keys()) if hasattr(result, "keys") else None
+                        ),
                     }
 
                 logger.api_response(response_summary)
@@ -440,7 +475,7 @@ def trace_api_calls(logger):
                 error_data = {
                     "error": str(e),
                     "type": type(e).__name__,
-                    "function": func_name
+                    "function": func_name,
                 }
                 logger.api_response(error_data, level=logging.ERROR)
                 raise
