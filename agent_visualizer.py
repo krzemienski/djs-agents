@@ -117,9 +117,7 @@ class AgentVisualizer:
         G = nx.DiGraph()
 
         # Add nodes for each component (deduplicate)
-        agents = set()
-        for call in self.agent_calls:
-            agents.add(call['agent'])
+        agents = {call['agent'] for call in self.agent_calls}
         for handoff in self.handoffs:
             agents.add(handoff['from'])
             agents.add(handoff['to'])
@@ -199,9 +197,7 @@ class AgentVisualizer:
             output_file = self.log_dir / f"timeline_{timestamp}.png"
 
         # Get all component names
-        agent_names = set()
-        for call in self.agent_calls:
-            agent_names.add(call['agent'])
+        agent_names = {call['agent'] for call in self.agent_calls}
 
         # Create figure
         fig, ax = plt.subplots(figsize=(15, 8))
@@ -292,7 +288,7 @@ class AgentVisualizer:
             'handoffs': self.handoffs,
             'token_usage': self.token_usage,
             'summary': {
-                'total_components': len(set(call['agent'] for call in self.agent_calls)),
+                'total_components': len({call['agent'] for call in self.agent_calls}),
                 'total_calls': len(self.agent_calls),
                 'total_handoffs': len(self.handoffs),
                 'total_api_calls': len(self.api_calls),
