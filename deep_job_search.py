@@ -134,107 +134,48 @@ def format_company_list(companies, limit=10):
         return ", ".join(companies[:limit]) + f" and {len(companies) - limit} more"
     return ", ".join(companies)
 
-def search_jobs_with_responses(query, model, logger):
+def parse_responses_output(response, logger):
     """
-    Search for jobs using the Responses API
+    Parse the output from the Responses API to extract job data
 
     Args:
-        query: Search query or instructions
-        model: Model to use for the search
+        response: Response object from the OpenAI Responses API
         logger: Logger instance
 
     Returns:
-        List of job dictionaries
+        List of job dictionaries or empty list on error
     """
-    logger.info(f"Searching for jobs with query: {query[:100]}...")
-
-    # Create OpenAI client
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-    # Get visualizer
-    visualizer = get_visualizer()
-
-    # Start timing
-    start_time = time.time()
-
-    with Timer("Job search", logger):
-        try:
-            # Create a response with web search enabled
-            response = client.responses.create(
-                model=model,
-                input=query,
-                tools=[{"type": "web_search"}]
-            )
-
-            # Record API call in visualizer
-            duration = time.time() - start_time
-            visualizer.track_api_call(
-                function_name="responses.create",
-                api_type="responses",
-                success=True,
-                duration=duration
-            )
-
-            # Log response structure for debugging
-            logger.debug(f"Response type: {type(response)}")
-            logger.debug(f"Response attributes: {dir(response)}")
-
-            # Debug the output field specifically
-            if hasattr(response, 'output'):
-                logger.debug(f"Output type: {type(response.output)}")
-                if isinstance(response.output, list):
-                    logger.debug(f"Output length: {len(response.output)}")
-                    for i, item in enumerate(response.output):
-                        logger.debug(f"Output[{i}] type: {type(item)}")
-                        logger.debug(f"Output[{i}] attributes: {dir(item)}")
-        except Exception as e:
-            # Record failed API call in visualizer
-            duration = time.time() - start_time
-            visualizer.track_api_call(
-                function_name="responses.create",
-                api_type="responses",
-                success=False,
-                duration=duration
-            )
-            logger.error(f"Error creating Responses API request: {e}")
-            return []
-
-        # Access response properties for debugging
-    logger.debug(f"Response has text attribute: {hasattr(response, 'text')}")
-    logger.debug(f"Response has output_text attribute: {hasattr(response, 'output_text')}")
-
-    # Get the response text content (handles different API versions)
     try:
         with Timer("Parsing job data", logger):
-                        # Extract text from the response
-            # Get text from Response object
-
+            # Extract text from the response
             # Try different methods to get the result text based on what's available
             result_text = ""
 
             # Focus on the output field which seems to be most reliable
             if hasattr(response, 'output') and response.output:
                 # The output field typically contains the message from the assistant
-                if isinstance(response.output, list) and len(response.output) > 1:
-                    # The second item might be the actual message (after web search)
-                    output_message = response.output[1]
-                    if hasattr(output_message, 'content') and isinstance(output_message.content, list):
-                        logger.debug("Using output_message.content")
-                        for content_item in output_message.content:
-                            if hasattr(content_item, 'text'):
-                                logger.debug("Found text in content item")
-                                result_text = content_item.text
-                                break
+                if isinstance(response.output, list):
+                    # Add bounds check to avoid IndexError
+                    output_idx = 1 if len(response.output) > 1 else 0
+                    if output_idx < len(response.output):
+                        output_message = response.output[output_idx]
+                        if hasattr(output_message, 'content') and isinstance(output_message.content, list):
+                            logger.debug("Using output_message.content")
+                            for content_item in output_message.content:
+                                if hasattr(content_item, 'text'):
+                                    logger.debug("Found text in content item")
+                                    result_text = content_item.text
+                                    break
 
-                    # If we still don't have text, try other methods
-                    if not result_text and hasattr(output_message, 'text'):
-                        logger.debug("Using output_message.text")
-                        result_text = output_message.text
+                        # If we still don't have text, try other methods
+                        if not result_text and hasattr(output_message, 'text'):
+                            logger.debug("Using output_message.text")
+                            result_text = output_message.text
 
-                    # If nothing worked, convert to string
-                    if not result_text:
-                        logger.debug("Using str(output_message)")
-                        result_text = str(output_message)
+                        # If nothing worked, convert to string
+                        if not result_text:
+                            logger.debug("Using str(output_message)")
+                            result_text = str(output_message)
 
             # Still no result? Fall back to text attribute
             if not result_text and hasattr(response, 'text') and response.text:
@@ -256,7 +197,7 @@ def search_jobs_with_responses(query, model, logger):
 
             logger.info(f"Search returned {len(result_text)} characters of results")
 
-                        # Now look for job listings in the response text
+            # Now look for job listings in the response text
             jobs = []
 
             logger.debug(f"Result text type: {type(result_text)}")
@@ -357,17 +298,101 @@ def search_jobs_with_responses(query, model, logger):
         # Return empty list on error
         return []
 
-def search_major_companies_with_responses(count, model, logger):
-    """Search for jobs at major companies using Responses API"""
-    companies = format_company_list(MAJOR_COMPANIES)
+def search_jobs_with_responses(query, model, logger):
+    """
+    Search for jobs using the Responses API
+
+    Args:
+        query: Search query or instructions
+        model: Model to use for the search
+        logger: Logger instance
+
+    Returns:
+        List of job dictionaries
+    """
+    logger.info(f"Searching for jobs with query: {query[:100]}...")
+
+    # Create OpenAI client
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+    # Get visualizer
+    visualizer = get_visualizer()
+
+    # Start timing
+    start_time = time.time()
+
+    with Timer("Job search", logger):
+        try:
+            # Create a response with web search enabled
+            response = client.responses.create(
+                model=model,
+                input=query,
+                tools=[{"type": "web_search"}]
+            )
+
+            # Record API call in visualizer
+            duration = time.time() - start_time
+            visualizer.track_api_call(
+                function_name="responses.create",
+                api_type="responses",
+                success=True,
+                duration=duration
+            )
+
+            # Log response structure for debugging
+            logger.debug(f"Response type: {type(response)}")
+            logger.debug(f"Response attributes: {dir(response)}")
+
+            # Debug the output field specifically
+            if hasattr(response, 'output'):
+                logger.debug(f"Output type: {type(response.output)}")
+                if isinstance(response.output, list):
+                    logger.debug(f"Output length: {len(response.output)}")
+                    for i, item in enumerate(response.output):
+                        logger.debug(f"Output[{i}] type: {type(item)}")
+                        logger.debug(f"Output[{i}] attributes: {dir(item)}")
+        except Exception as e:
+            # Record failed API call in visualizer
+            duration = time.time() - start_time
+            visualizer.track_api_call(
+                function_name="responses.create",
+                api_type="responses",
+                success=False,
+                duration=duration
+            )
+            logger.error(f"Error creating Responses API request: {e}")
+            return []
+
+        # Access response properties for debugging
+    logger.debug(f"Response has text attribute: {hasattr(response, 'text')}")
+    logger.debug(f"Response has output_text attribute: {hasattr(response, 'output_text')}")
+
+    # Parse the response
+    return parse_responses_output(response, logger)
+
+def search_companies_with_responses(company_type, companies, count, model, logger):
+    """
+    Unified search function for both major and startup companies
+
+    Args:
+        company_type: "Major" or "Startup"
+        companies: List of companies to search
+        count: Number of jobs to search for
+        model: Model to use for search
+        logger: Logger instance
+
+    Returns:
+        List of job dictionaries
+    """
+    companies_text = format_company_list(companies)
     keywords = ", ".join(KEYWORDS[:5])
 
-    logger.info(f"Searching for {count} jobs at major companies using Responses API")
+    logger.info(f"Searching for {count} jobs at {company_type.lower()} companies using Responses API")
 
     query = f"""
-    I need you to find {count} software engineering job listings at major companies in the video/streaming industry.
+    I need you to find {count} software engineering job listings at {company_type.lower()} companies in the video/streaming industry.
 
-    Focus on these companies: {companies}
+    Focus on these companies: {companies_text}
     Look for roles with keywords like: {keywords}
 
     For each job listing, I need:
@@ -376,38 +401,20 @@ def search_major_companies_with_responses(count, model, logger):
     3. The direct URL to the job posting (not a careers page)
 
     Return the results as a structured JSON array with fields: title, company, url, type
-    Set the "type" field to "Major" for all these companies.
+    Set the "type" field to "{company_type}" for all these companies.
 
     Only include real job postings with direct application links.
     """
 
     return search_jobs_with_responses(query, model, logger)
+
+def search_major_companies_with_responses(count, model, logger):
+    """Search for jobs at major companies using Responses API"""
+    return search_companies_with_responses("Major", MAJOR_COMPANIES, count, model, logger)
 
 def search_startup_companies_with_responses(count, model, logger):
     """Search for jobs at startup companies using Responses API"""
-    companies = format_company_list(STARTUP_COMPANIES)
-    keywords = ", ".join(KEYWORDS[:5])
-
-    logger.info(f"Searching for {count} jobs at startup companies using Responses API")
-
-    query = f"""
-    I need you to find {count} software engineering job listings at startups in the video/streaming industry.
-
-    Focus on these startups: {companies}
-    Look for roles with keywords like: {keywords}
-
-    For each job listing, I need:
-    1. The exact job title
-    2. The company name
-    3. The direct URL to the job posting (not a careers page)
-
-    Return the results as a structured JSON array with fields: title, company, url, type
-    Set the "type" field to "Startup" for all these companies.
-
-    Only include real job postings with direct application links.
-    """
-
-    return search_jobs_with_responses(query, model, logger)
+    return search_companies_with_responses("Startup", STARTUP_COMPANIES, count, model, logger)
 
 def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
     """
