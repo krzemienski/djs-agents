@@ -223,16 +223,31 @@ def parse_responses_output(response, logger):
             if not isinstance(result_text, str):
                 result_text = str(result_text)
 
-            # Look for a JSON array in the text
-            json_match = re.search(r'\[\s*\{.*?\}\s*\]', result_text, re.DOTALL)
-            if json_match:
-                jobs_json = json_match.group(0)
-                try:
-                    jobs = json.loads(jobs_json)
-                    logger.info(f"Successfully parsed JSON data: {len(jobs)} jobs found")
-                    return jobs
-                except json.JSONDecodeError as e:
-                    logger.debug(f"JSON decode error: {e}")
+            # Look for a JSON array in the text using a safer approach
+            # Find the first '[' and last ']' characters to extract potential JSON array
+            try:
+                start_idx = result_text.find('[')
+                if start_idx != -1:
+                    # Find the matching closing bracket
+                    bracket_count = 0
+                    for i in range(start_idx, len(result_text)):
+                        if result_text[i] == '[':
+                            bracket_count += 1
+                        elif result_text[i] == ']':
+                            bracket_count -= 1
+                            if bracket_count == 0:
+                                # We found the matching closing bracket
+                                end_idx = i + 1
+                                potential_json = result_text[start_idx:end_idx]
+                                try:
+                                    jobs = json.loads(potential_json)
+                                    logger.info(f"Successfully parsed JSON data: {len(jobs)} jobs found")
+                                    return jobs
+                                except json.JSONDecodeError as e:
+                                    logger.debug(f"JSON decode error: {e}")
+                                break
+            except Exception as e:
+                logger.debug(f"Error during JSON bracket extraction: {e}")
 
             # If no JSON found, try to parse markdown table
             table_match = re.search(r'\|\s*Title\s*\|\s*Company\s*\|\s*URL\s*\|', result_text)
