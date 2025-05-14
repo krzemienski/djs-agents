@@ -252,6 +252,83 @@ OPENAI_API_KEY=your_api_key_here
 ./build-and-run.sh --model gpt-3.5-turbo    # Lowest cost option
 ```
 
+### Comprehensive Examples
+
+```bash
+# Economy run - Lowest cost option (~$0.008)
+./build-and-run.sh --model gpt-3.5-turbo --majors 5 --startups 5 --log-level WARNING --no-visualize
+
+# Standard run - Balanced cost/performance (~$0.04)
+./build-and-run.sh --model gpt-4o --majors 10 --startups 10 --company-list-limit 10
+
+# High performance run - Better quality within $0.25 budget
+./build-and-run.sh --model gpt-4.1 --majors 15 --startups 10 --force --budget 0.25 --use-web-verify
+
+# Maximum performance run - All options with $25 budget limit
+./build-and-run.sh --model gpt-4.1 --majors 50 --startups 50 --force --budget 25.00 --log-level DEBUG --max-tokens 500000 --company-list-limit 20 --visualize --use-web-verify
+```
+
+### Feature-specific Examples
+
+```bash
+# Run with budget control
+./build-and-run.sh --budget 0.10 --force
+
+# Estimate costs without running
+JOBBOT_ESTIMATE_ONLY=1 ./build-and-run.sh --majors 20 --startups 20 --model gpt-4.1
+
+# Force rebuild Docker image with sample run
+./build-and-run.sh --rebuild --sample
+
+# Custom log file with increased verbosity
+./build-and-run.sh --log-level DEBUG --log-file custom_jobsearch.log
+
+# Disable visualizations for faster execution
+./build-and-run.sh --no-visualize
+
+# Maximum company list detail in prompts
+./build-and-run.sh --company-list-limit 20
+
+# Skip all confirmations with environment variable
+JOBBOT_SKIP_CONFIRM=1 ./build-and-run.sh --model gpt-4.1 --majors 30 --startups 20
+```
+
+### Debugging and Development
+
+```bash
+# Verbose debugging with trace output
+./build-and-run.sh --log-level DEBUG --trace
+
+# Testing with future web verification feature
+./build-and-run.sh --sample --use-web-verify
+
+# Development quick test with debug logs
+./build-and-run.sh --sample --log-level DEBUG --rebuild
+
+# Full test with all features
+./build-and-run.sh --model gpt-4.1 --majors 5 --startups 5 --log-level DEBUG --trace --company-list-limit 15 --max-tokens 100000 --visualize --force
+```
+
+### All Options Example
+
+```bash
+# Example with every single CLI option specified
+./build-and-run.sh \
+  --model gpt-4.1 \
+  --majors 25 \
+  --startups 25 \
+  --max-tokens 200000 \
+  --budget 25.00 \
+  --force \
+  --log-level DEBUG \
+  --log-file comprehensive_job_search.log \
+  --trace \
+  --company-list-limit 20 \
+  --visualize \
+  --rebuild \
+  --use-web-verify
+```
+
 ### Logging and Debugging
 
 ```bash
