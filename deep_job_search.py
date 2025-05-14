@@ -1,8 +1,13 @@
 #!/usr/bin/env python
 """
-deep_job_search.py — Deep Job Search with Responses API implementation
+deep_job_search.py — Deep Job Search with Multi-Agent implementation
 
-This file uses the Responses API for a simple, efficient job search.
+This file uses the OpenAI Agents SDK for an advanced, multi-agent job search
+architecture. It implements a pipeline of specialized agents:
+1. Planner - Creates search strategies
+2. Searcher - Performs web searches for jobs
+3. Processor - Processes and extracts structured job data
+4. Verifier - Validates job URLs and application processes
 """
 
 import os
@@ -12,13 +17,16 @@ import time
 import argparse
 import logging
 import sys
+import asyncio
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
+from urllib.parse import urlparse
 
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
+from agents import Agent, Runner, function_tool, ModelSettings, WebSearchTool, usage as agent_usage
 
 # Import our utility modules
 from logger_utils import setup_enhanced_logger, DepthContext
@@ -111,14 +119,19 @@ KEYWORDS = [
 
 
 # ------------- Data models -------------
+class JobSearchPair(BaseModel):
+    """A company-keyword pair for job searching"""
+    company: str
+    keyword: str
+
 class JobListing(BaseModel):
     """A job listing with relevant details"""
-
     title: str
     company: str
     type: str  # Major or Startup
     url: str
     has_apply: bool = False
+    found_date: Optional[str] = None
 
 
 # ------------- logging -------------
@@ -198,535 +211,778 @@ class TokenMonitor:
             base_model, 0.005
         )  # Default to mid-tier pricing if unknown
 
+# ------------- Agent tools -------------
+@function_tool
+def validate_job_url(url: str) -> bool:
+    """
+    Validate if a job URL is likely to be a real job posting
 
-# ------------- Responses API implementation -------------
+    Args:
+        url: The job URL to validate
+
+    Returns:
+        bool: True if the URL appears to be a valid job posting, False otherwise
+    """
+    try:
+        # Check if URL is properly formatted
+        parsed_url = urlparse(url)
+        if not all([parsed_url.scheme, parsed_url.netloc]):
+            return False
+
+        # Check for common job board domains and patterns
+        job_domains = [
+            "linkedin.com/jobs", "indeed.com/job", "glassdoor.com/job",
+            "lever.co", "greenhouse.io", "workday.com", "smartrecruiters.com",
+            "jobs.", "careers.", "apply.", "/job/", "/jobs/"
+        ]
+
+        # Check for suspicious patterns
+        suspicious_patterns = [
+            "example.com", "test", "dummy", "placeholder",
+            "{company}", "{role}", "{id}", "{keyword}"
+        ]
+
+        # Check domain and path
+        url_lower = url.lower()
+
+        # Return False if any suspicious pattern is found
+        if any(pattern in url_lower for pattern in suspicious_patterns):
+            return False
+
+        # Return True if any job domain pattern is found
+        return any(pattern in url_lower for pattern in job_domains)
+
+    except Exception:
+        return False
+
+@function_tool
+async def extract_job_listings(query: str) -> str:
+    """
+    Extract job listings from search results
+
+    Args:
+        query: The search query text
+
+    Returns:
+        str: Extracted job listings
+    """
+    # Define regex patterns for job listing extraction
+    job_patterns = [
+        # Standard job listing pattern with title and company
+        r'(?i)(senior|junior|staff|principal)?\s*([a-z\s]+)(engineer|developer|architect)\s+(?:at|with|for|@)\s+([a-z0-9\s\.,]+)\s*(?:-|–|:)\s*.*?(https?://[^\s"\']+)',
+
+        # Job title with company - common format
+        r'(?i)"?([a-z0-9\s\-]+(?:engineer|developer|architect)[a-z0-9\s\-]*)"?\s+(?:at|with|for|@)\s+([a-z0-9\s\.,\-]+)\s*(?:\(|:|\.|,|\n|\[|\-|–)\s*(https?://[^\s"\'\)]+)',
+
+        # Company careers page with job titles
+        r'(?i)([a-z0-9\s\.,\-]+)\s+(?:careers|jobs|positions|roles)\s+(?:available|open).*?(https?://[^\s"\'\)]+careers|jobs|positions)',
+
+        # URL with job in path
+        r'(https?://[^\s"\']+(?:job|career)[^\s"\']*)',
+
+        # Job board URL with typical parameters
+        r'(https?://(?:www\.)?(?:linkedin\.com|indeed\.com|glassdoor\.com|lever\.co|greenhouse\.io|workday\.com)\/[^\s"\']+)'
+    ]
+
+    all_matches = []
+
+    # Apply each pattern and collect matches
+    for pattern in job_patterns:
+        matches = re.findall(pattern, query)
+        if matches:
+            all_matches.extend(matches)
+
+    # Format results
+    results = []
+    for match in all_matches:
+        # Handle different match formats
+        if isinstance(match, tuple):
+            if len(match) >= 5:  # First pattern
+                title = f"{match[0]} {match[1]} {match[2]}".strip()
+                company = match[3].strip()
+                url = match[4].strip()
+            elif len(match) >= 3:  # Second and third patterns
+                if "careers" in match[2] or "jobs" in match[2]:
+                    # Company careers page
+                    company = match[0].strip()
+                    title = "Multiple Positions"
+                    url = match[2].strip()
+                else:
+                    # Standard job listing
+                    title = match[0].strip()
+                    company = match[1].strip()
+                    url = match[2].strip()
+            else:
+                continue
+        else:
+            # Single URL match
+            url = match.strip()
+            title = "Job Listing"
+            company = urlparse(url).netloc.replace("www.", "")
+
+        # Basic validation of extracted URL
+        if validate_job_url(url):
+            results.append({
+                "title": title.strip(),
+                "company": company.strip(),
+                "url": url.strip()
+            })
+
+    # Return formatted results
+    return json.dumps(results, indent=2)
+
+@function_tool
+async def verify_job_url(url: str, use_web_search: bool = False) -> bool:
+    """
+    Verify if a job URL is valid by checking URL patterns and optionally using web search
+
+    Args:
+        url: The job URL to verify
+        use_web_search: Whether to use web search for verification
+
+    Returns:
+        bool: True if the URL is a valid job posting, False otherwise
+    """
+    # First perform basic validation
+    if not validate_job_url(url):
+        return False
+
+    # If web search is enabled, perform additional verification
+    if use_web_search:
+        try:
+            # Use web search to verify the URL
+            search_result = await web_search(f"Is this a real job posting: {url}")
+
+            # Look for verification indicators in search results
+            verification_indicators = [
+                "apply now", "submit application", "job description",
+                "qualifications", "responsibilities", "requirements",
+                "position details", "compensation", "benefits", "upload resume"
+            ]
+
+            # Look for red flags in search results
+            red_flags = [
+                "page not found", "404", "job no longer available",
+                "position filled", "job has expired", "removed", "not available"
+            ]
+
+            # Check for indicators and red flags
+            search_text = search_result.lower()
+
+            # If any red flag is found, return False
+            if any(flag in search_text for flag in red_flags):
+                return False
+
+            # Return True if any verification indicator is found
+            return any(indicator in search_text for indicator in verification_indicators)
+
+        except Exception:
+            # If web search fails, fall back to basic validation
+            return True
+
+    # If web search is not enabled, return the basic validation result
+    return True
+
+# ------------- Agent prompts -------------
 def format_company_list(companies, limit=10):
     """Format a list of companies for the prompt"""
     if limit and len(companies) > limit:
         return ", ".join(companies[:limit]) + f" and {len(companies) - limit} more"
     return ", ".join(companies)
 
+def planner_prompt(major_companies, startup_companies, keywords) -> str:
+    major_companies_str = ", ".join(major_companies)
+    startup_companies_str = ", ".join(startup_companies)
+    keywords_str = ", ".join(keywords)
 
-def parse_responses_output(response, logger):
+    return f"""
+## Role
+You are a job search planning agent specialized in software engineering roles.
+
+## Task
+Create an optimal job search strategy that balances major companies and startups.
+
+## Instructions
+1. Create a search plan that pairs companies with relevant keywords
+2. Focus on high-quality, strategic company-keyword pairs
+3. Balance between major companies and startups
+4. Avoid duplicate companies in the plan
+5. CRITICAL: Consider only companies that are likely to have REAL job postings
+6. Target companies where you can find ACTIVE job listings with working URLs
+
+## Major Companies
+{major_companies_str}
+
+## Startup Companies
+{startup_companies_str}
+
+## Keywords
+{keywords_str}
+
+## Output Format
+Return a valid JSON array of objects with 'company' and 'keyword' pairs:
+```json
+[
+  {{
+    "company": "Company Name",
+    "keyword": "Keyword"
+  }},
+  ...
+]
+```
+
+## Rules
+- Include a diverse mix of companies and keywords
+- Focus on promising company-keyword combinations that will lead to real job listings
+- Avoid keywords that are too generic or too specific
+- Prioritize companies known to be actively hiring
+- Include all company types (both major and startup)
+- Return exactly in the JSON format specified
+"""
+
+def searcher_prompt() -> str:
+    return """
+## Role
+You are a job search agent specialized in finding software engineering roles.
+
+## Task
+Find job listings for specific companies and keywords using web search.
+
+## Instructions
+1. Perform a targeted search for job listings using the company and keyword
+2. Focus on finding active, legitimate job postings with application links
+3. Extract job information from search results and websites
+4. Filter results to find the most relevant technical roles
+5. IMPORTANT: Only collect REAL job listings that actually exist
+6. Verify that job URLs follow standard patterns for legitimate postings
+7. When using search, target career pages and job boards
+8. Collect sufficient details about each job for the processor agent
+
+## Strategies
+- Search for "[Company] [Keyword] jobs careers apply"
+- Search for "[Company] careers [Keyword] engineer apply"
+- Look for careers.company.com, jobs.company.com, or company pages on job boards
+- Check LinkedIn, Indeed, Glassdoor, and company career pages
+- Use detailed searches to find specific role types
+
+## Rules
+- Focus on collecting detailed, accurate information
+- Prioritize official company career pages and legitimate job boards
+- Only extract real job listings with working URLs
+- Never fabricate or imagine job listings
+- If no results are found, clearly state that no jobs were found
+- Pass all relevant search results to the processor
+
+## Available Tools
+- Web search
+- Job listing extractor
+"""
+
+def processor_prompt() -> str:
+    return """
+## Role
+You are a job listing processor agent specialized in extracting structured data.
+
+## Task
+Process and extract structured job listings from web search results.
+
+## Instructions
+1. Analyze the search results text
+2. Extract ONLY REAL job listings including title, company, URL, and type
+3. Format each listing with consistent structure
+4. Filter out irrelevant results and duplicates
+5. Return only relevant technical job postings
+6. Ensure URLs are complete and properly formatted
+7. IMPORTANT: Always return valid JSON format
+8. CRITICAL: NEVER create or invent job listings. Only extract real jobs from the search results.
+9. If no relevant job listings are found, return an empty array []
+
+## Output Structure
+Each job listing must include these fields:
+- "title": The job title (string)
+- "company": The company name (string)
+- "url": The full URL to the job posting (string)
+- "type": The company type, usually "Major" or "Startup" (string)
+
+## Output Format
+Return results as a valid JSON array of objects:
+```json
+[
+  {
+    "title": "Senior Software Engineer",
+    "company": "Example Corp",
+    "url": "https://example.com/jobs/12345",
+    "type": "Major"
+  },
+  ...
+]
+```
+
+## Rules
+- Always use double quotes for JSON strings and property names
+- Ensure all URLs are valid and complete (not relative)
+- Return an empty array [] if no relevant jobs are found
+- Do not include explanations or markdown outside the JSON
+- NEVER invent or fabricate job listings - only extract real ones
+"""
+
+def verifier_prompt() -> str:
+    return """
+## Role
+You are a job listing verification agent.
+
+## Task
+Verify if a job URL is valid and contains an apply button or application form.
+
+## Instructions
+1. First, analyze the job URL pattern to determine if it's likely a valid job posting
+2. Common job URL patterns indicating a valid job:
+   - amazon.jobs/en/jobs/12345/title
+   - linkedin.com/jobs/view/12345
+   - indeed.com/viewjob?jk=12345
+   - careers.company.com/position/12345
+   - apply.company.com/job/12345
+   - jobs.company.com/openings/12345
+   - lever.co/company/12345
+   - greenhouse.io/company/12345
+   - workday.com/company/12345
+3. If web search is available, use it to verify the URL by checking:
+   - Is this a real job posting page?
+   - Does it contain an apply button or application form?
+   - Is it from a legitimate company website or job board?
+   - Does the page load without errors (no 404, etc.)?
+4. Red flags that indicate an invalid job:
+   - 404 errors or "job not found" messages
+   - Pages that redirect to generic career pages
+   - URLs that don't follow standard job listing patterns
+   - URLs that contain random placeholders or template patterns
+5. CRITICAL: Only mark URLs as valid if they point to REAL job listings
+
+## Output Format
+Return "true" if the URL is valid and points to a real job, "false" if not. Lowercase, no explanation.
+"""
+
+# ------------- Multi-agent job search implementation -------------
+async def gather_jobs_with_multi_agents(cfg, logger) -> List[Dict[str, Any]]:
     """
-    Parse the output from the Responses API to extract job data
-
-    Args:
-        response: Response object from the OpenAI Responses API
-        logger: Logger instance
-
-    Returns:
-        List of job dictionaries or empty list on error
-    """
-    try:
-        with Timer("Parsing job data", logger):
-            # Extract text from the response
-            # Try different methods to get the result text based on what's available
-            result_text = ""
-
-            # Focus on the output field which seems to be most reliable
-            if hasattr(response, "output") and response.output:
-                # The output field typically contains the message from the assistant
-                if isinstance(response.output, list):
-                    # Add bounds check to avoid IndexError
-                    output_idx = 1 if len(response.output) > 1 else 0
-                    if output_idx < len(response.output):
-                        output_message = response.output[output_idx]
-                        if hasattr(output_message, "content") and isinstance(
-                            output_message.content, list
-                        ):
-                            logger.debug("Using output_message.content")
-                            for content_item in output_message.content:
-                                if hasattr(content_item, "text"):
-                                    logger.debug("Found text in content item")
-                                    result_text = content_item.text
-                                    break
-
-                        # If we still don't have text, try other methods
-                        if not result_text and hasattr(output_message, "text"):
-                            logger.debug("Using output_message.text")
-                            result_text = output_message.text
-
-                        # If nothing worked, convert to string
-                        if not result_text:
-                            logger.debug("Using str(output_message)")
-                            result_text = str(output_message)
-
-            # Still no result? Fall back to text attribute
-            if not result_text and hasattr(response, "text") and response.text:
-                logger.debug("Using response.text attribute")
-                if hasattr(response.text, "value"):
-                    result_text = response.text.value
-                else:
-                    result_text = str(response.text)
-
-            # Last resort, try output_text
-            if (
-                not result_text
-                and hasattr(response, "output_text")
-                and response.output_text
-            ):
-                logger.debug("Using response.output_text")
-                result_text = str(response.output_text)
-
-            # If we still don't have text, use the entire response
-            if not result_text:
-                logger.debug("Using fallback approach with whole response")
-                result_text = str(response)
-
-            logger.info(f"Search returned {len(result_text)} characters of results")
-
-            # Now look for job listings in the response text
-            jobs = []
-
-            logger.debug(f"Result text type: {type(result_text)}")
-
-            # Check if the response text itself might already be JSON or contains job data
-            if isinstance(result_text, dict) or isinstance(result_text, list):
-                try:
-                    # If it's already a list or dict, try to use it directly
-                    if isinstance(result_text, list):
-                        jobs = result_text
-                    else:
-                        # If it's a dict with job data, wrap it in a list
-                        if (
-                            "title" in result_text
-                            and "company" in result_text
-                            and "url" in result_text
-                        ):
-                            jobs = [result_text]
-
-                    if jobs:
-                        logger.info(
-                            f"Used direct data structure: {len(jobs)} jobs found"
-                        )
-                        return jobs
-                except Exception as e:
-                    logger.debug(f"Error using direct structure: {e}")
-
-            # Convert to string if not already
-            if not isinstance(result_text, str):
-                result_text = str(result_text)
-
-            # Look for a JSON array in the text using a safer approach
-            # Find the first '[' and last ']' characters to extract potential JSON array
-            try:
-                start_idx = result_text.find("[")
-                if start_idx != -1:
-                    # Find the matching closing bracket
-                    bracket_count = 0
-                    for i in range(start_idx, len(result_text)):
-                        if result_text[i] == "[":
-                            bracket_count += 1
-                        elif result_text[i] == "]":
-                            bracket_count -= 1
-                            if bracket_count == 0:
-                                # We found the matching closing bracket
-                                end_idx = i + 1
-                                potential_json = result_text[start_idx:end_idx]
-                                try:
-                                    jobs = json.loads(potential_json)
-                                    logger.info(
-                                        f"Successfully parsed JSON data: {len(jobs)} jobs found"
-                                    )
-                                    return jobs
-                                except json.JSONDecodeError as e:
-                                    logger.debug(f"JSON decode error: {e}")
-                                break
-            except Exception as e:
-                logger.debug(f"Error during JSON bracket extraction: {e}")
-
-            # If no JSON found, try to parse markdown table
-            table_match = re.search(
-                r"\|\s*Title\s*\|\s*Company\s*\|\s*URL\s*\|", result_text
-            )
-            if table_match:
-                # Parse markdown table
-                jobs = []
-                lines = result_text.split("\n")
-                start_idx = None
-
-                for i, line in enumerate(lines):
-                    if (
-                        "|" in line
-                        and ("Title" in line or "title" in line)
-                        and ("Company" in line or "company" in line)
-                    ):
-                        start_idx = i + 2  # Skip header and separator
-                        break
-
-                if start_idx:
-                    for i in range(start_idx, len(lines)):
-                        line = lines[i].strip()
-                        if not line or "|" not in line:
-                            continue
-
-                        parts = [p.strip() for p in line.split("|")]
-                        if len(parts) >= 4:
-                            # Handle row with Title, Company, URL columns
-                            title = parts[1]
-                            company = parts[2]
-                            url = parts[3]
-
-                            if "http" in url:
-                                job_type = (
-                                    "Major" if company in MAJOR_COMPANIES else "Startup"
-                                )
-                                jobs.append(
-                                    {
-                                        "title": title,
-                                        "company": company,
-                                        "url": url,
-                                        "type": job_type,
-                                    }
-                                )
-                logger.info(
-                    f"Successfully parsed markdown table: {len(jobs)} jobs found"
-                )
-                return jobs
-
-            # If parsing table fails, use regex to find potential job listings
-            logger.info("Falling back to regex pattern matching for job data")
-            jobs = []
-
-            # Regex patterns for different job title formats
-            title_at_company_pattern = r"([A-Za-z\s\-–&]+) at ([A-Za-z\s\-–&]+)"
-            company_hiring_pattern = (
-                r"([A-Za-z\s\-–&]+) is hiring:?\s*([A-Za-z\s\-–&]+)"
-            )
-            url_pattern = r"(https?://[^\s]+)"
-
-            # Words to ignore as titles (false positives like action verbs)
-            ignore_words = [
-                "apply",
-                "learn",
-                "more",
-                "view",
-                "click",
-                "check",
-                "see",
-                "visit",
-                "join",
-            ]
-
-            # Find "<title> at <company>" matches
-            title_matches = re.findall(title_at_company_pattern, result_text)
-            url_matches = re.findall(url_pattern, result_text)
-
-            for i, (title, company) in enumerate(title_matches):
-                # Skip if the title is a common action verb (false positive)
-                if title.strip().lower() in ignore_words:
-                    continue
-
-                if i < len(url_matches):
-                    url = url_matches[i]
-                    job_type = (
-                        "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
-                    )
-                    jobs.append(
-                        {
-                            "title": title.strip(),
-                            "company": company.strip(),
-                            "url": url,
-                            "type": job_type,
-                        }
-                    )
-
-            # Also find "<company> is hiring: <title>" matches
-            hiring_matches = re.findall(company_hiring_pattern, result_text)
-            start_idx = len(jobs)
-
-            for i, (company, title) in enumerate(hiring_matches):
-                # Skip if the title is a common action verb (false positive)
-                if title.strip().lower() in ignore_words:
-                    continue
-
-                if start_idx + i < len(url_matches):
-                    url = url_matches[start_idx + i]
-                    job_type = (
-                        "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
-                    )
-                    jobs.append(
-                        {
-                            "title": title.strip(),
-                            "company": company.strip(),
-                            "url": url,
-                            "type": job_type,
-                        }
-                    )
-
-            logger.info(f"Found {len(jobs)} jobs using regex pattern matching")
-            return jobs
-
-    except Exception as e:
-        logger.error(f"Error parsing job data: {e}")
-        # Return empty list on error
-        return []
-
-
-def search_jobs_with_responses(query, model, logger):
-    """
-    Search for jobs using the Responses API
-
-    Args:
-        query: Search query or instructions
-        model: Model to use for the search
-        logger: Logger instance
-
-    Returns:
-        List of job dictionaries
-    """
-    logger.info(f"Searching for jobs with query: {query[:100]}...")
-
-    # Create OpenAI client
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-    # Get visualizer
-    visualizer = get_visualizer()
-
-    # Start timing
-    start_time = time.time()
-
-    with Timer("Job search", logger):
-        try:
-            # Create a response with web search enabled
-            response = client.responses.create(
-                model=model, input=query, tools=[{"type": "web_search"}]
-            )
-
-            # Record API call in visualizer
-            duration = time.time() - start_time
-            visualizer.track_api_call(
-                function_name="responses.create",
-                api_type="responses",
-                success=True,
-                duration=duration,
-            )
-
-            # Log response structure for debugging
-            logger.debug(f"Response type: {type(response)}")
-            logger.debug(f"Response attributes: {dir(response)}")
-
-            # Debug the output field specifically
-            if hasattr(response, "output"):
-                logger.debug(f"Output type: {type(response.output)}")
-                if isinstance(response.output, list):
-                    logger.debug(f"Output length: {len(response.output)}")
-                    for i, item in enumerate(response.output):
-                        logger.debug(f"Output[{i}] type: {type(item)}")
-                        logger.debug(f"Output[{i}] attributes: {dir(item)}")
-        except Exception as e:
-            # Record failed API call in visualizer
-            duration = time.time() - start_time
-            visualizer.track_api_call(
-                function_name="responses.create",
-                api_type="responses",
-                success=False,
-                duration=duration,
-            )
-            logger.error(f"Error creating Responses API request: {e}")
-            return []
-
-        # Access response properties for debugging
-    logger.debug(f"Response has text attribute: {hasattr(response, 'text')}")
-    logger.debug(
-        f"Response has output_text attribute: {hasattr(response, 'output_text')}"
-    )
-
-    # Parse the response
-    return parse_responses_output(response, logger)
-
-
-def search_companies_with_responses(
-    company_type, companies, count, model, logger, limit=None
-):
-    """
-    Unified search function for both major and startup companies
-
-    Args:
-        company_type: "Major" or "Startup"
-        companies: List of companies to search
-        count: Number of jobs to search for
-        model: Model to use for search
-        logger: Logger instance
-        limit: Limit for company list formatting (optional)
-
-    Returns:
-        List of job dictionaries
-    """
-    companies_text = format_company_list(companies, limit)
-    keywords = ", ".join(KEYWORDS[:5])
-
-    logger.info(
-        f"Searching for {count} jobs at {company_type.lower()} companies using Responses API"
-    )
-
-    query = f"""
-    I need you to find {count} software engineering job listings at {company_type.lower()} companies in the video/streaming industry.
-
-    Focus on these companies: {companies_text}
-    Look for roles with keywords like: {keywords}
-
-    For each job listing, I need:
-    1. The exact job title
-    2. The company name
-    3. The direct URL to the job posting (not a careers page)
-
-    Return the results as a structured JSON array with fields: title, company, url, type
-    Set the "type" field to "{company_type}" for all these companies.
-
-    Only include real job postings with direct application links.
-    """
-
-    return search_jobs_with_responses(query, model, logger)
-
-
-def search_major_companies_with_responses(count, model, logger, limit=None):
-    """Search for jobs at major companies using Responses API"""
-    return search_companies_with_responses(
-        "Major", MAJOR_COMPANIES, count, model, logger, limit
-    )
-
-
-def search_startup_companies_with_responses(count, model, logger, limit=None):
-    """Search for jobs at startup companies using Responses API"""
-    return search_companies_with_responses(
-        "Startup", STARTUP_COMPANIES, count, model, logger, limit
-    )
-
-
-def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
-    """
-    Gather job listings using the OpenAI Responses API approach.
-    This is a simpler and more efficient alternative to the multi-agent approach.
+    Main function that coordinates the multi-agent job search workflow
 
     Args:
         cfg: Configuration dictionary
         logger: Logger instance
 
     Returns:
-        List of job listing dictionaries
+        List of job dictionaries
     """
+    majors_quota = cfg.get("majors", 10)
+    startups_quota = cfg.get("startups", 10)
+    model = cfg.get("model", "gpt-4o")
+    company_list_limit = cfg.get("company_list_limit", 10)
+    use_web_verification = cfg.get("use_web_verify", False)
+
+    logger.info(f"Starting multi-agent job search workflow")
+    logger.info(f"Targeting {majors_quota} major company jobs and {startups_quota} startup jobs")
+    logger.info(f"Web URL verification: {'Enabled' if use_web_verification else 'Basic validation only'}")
+
+    # Initialize agents
+    logger.info("Initializing agents...")
+
+    # Initialize planner agent
+    planner = Agent(
+        name="planner",
+        instructions=planner_prompt(MAJOR_COMPANIES, STARTUP_COMPANIES, KEYWORDS),
+        model=model,
+        model_settings=ModelSettings(temperature=0)
+    )
+
+    # Initialize processor agent
+    processor = Agent(
+        name="processor",
+        instructions=processor_prompt(),
+        model=model,
+        model_settings=ModelSettings(temperature=0)
+    )
+
+    # Initialize verifier agent
+    verifier = Agent(
+        name="verifier",
+        instructions=verifier_prompt(),
+        model=model,
+        model_settings=ModelSettings(temperature=0)
+    )
+
+    # Set up the processor to hand off to verifier
+    processor.handoffs = [verifier]
+
+    # Initialize searcher agent with our URL validation tools
+    searcher = Agent(
+        name="searcher",
+        instructions=searcher_prompt(),
+        tools=[WebSearchTool(), extract_job_listings, validate_job_url, verify_job_url],
+        model=model,
+        model_settings=ModelSettings(temperature=0),
+        handoffs=[processor]
+    )
+
     # Get visualizer
     visualizer = get_visualizer()
 
-    # Reset visualizer for new run
-    visualizer.reset()
-
-    # Start timing
-    api_start_time = time.time()
-
-    # Log function start with configuration
-    logger.info(
-        f"Job search started with Responses API using configuration: {json.dumps(cfg, indent=2)}"
-    )
-
-    # Estimate token usage and cost
-    tokens_estimate = (cfg["majors"] + cfg["startups"]) * 2000  # Rough estimate
-
-    # Calculate cost based on model
-    model = cfg.get("model", "gpt-4o")
-    rate = TokenMonitor.COST_PER_1K.get(model, 0.005)  # Default to gpt-4o rate
-    cost_estimate = (tokens_estimate / 1000) * rate
-
-    logger.info("Estimated resource usage:")
-    logger.info(f"  - Tokens: ~{tokens_estimate:,} tokens")
-    logger.info(f"  - Cost: ~${cost_estimate:.4f}")
-
-    if cost_estimate > 0.50:  # Arbitrary threshold for a "high" cost
-        logger.warning(
-            f"⚠️ COST WARNING: Estimated cost (${cost_estimate:.4f}) exceeds $0.50"
+    # Execute planning phase
+    with Timer("Planning search strategies", logger):
+        logger.info("Planning search strategies...")
+        plan_start_time = time.time()
+        plan_result = await Runner.run(
+            planner,
+            input="Generate a job search plan focusing on both major and startup companies"
         )
-        logger.warning("Consider reducing job counts or using less expensive models")
+        plan_json = plan_result.final_output
+        plan_duration = time.time() - plan_start_time
 
-        # Give user a chance to abort if cost is high
-        if not cfg.get("force", False) and not os.environ.get(
-            "JOBBOT_SKIP_CONFIRM", ""
-        ):
-            logger.info(
-                "Continue? (y/n, or set JOBBOT_SKIP_CONFIRM=1 to skip this prompt)"
+        # Track planning step in visualizer
+        try:
+            # Get token information if available
+            tokens_used = {}
+            if hasattr(plan_result, 'tokens_in') and hasattr(plan_result, 'tokens_out'):
+                tokens_used = {"input": plan_result.tokens_in, "output": plan_result.tokens_out}
+            elif hasattr(plan_result, 'input_tokens') and hasattr(plan_result, 'output_tokens'):
+                tokens_used = {"input": plan_result.input_tokens, "output": plan_result.output_tokens}
+            elif hasattr(agent_usage, 'tokens_per_model'):
+                # Use the overall agent usage if detailed tokens not available
+                tokens_used = {model: count for model, count in agent_usage.tokens_per_model.items()}
+
+            visualizer.track_agent_call(
+                agent_name="Planner",
+                input_text="Generate job search plan",
+                output_text=plan_json if len(plan_json) < 1000 else plan_json[:1000] + "...",
+                duration=plan_duration,
+                tokens_used=tokens_used,
             )
-            try:
-                response = input().strip().lower()
-                if response != "y":
-                    logger.info("Aborting job search")
-                    return []
-            except (KeyboardInterrupt, EOFError):
-                logger.info("\nAborting job search")
-                return []
+        except Exception as e:
+            logger.warning(f"Failed to track planning visualization: {e}")
 
-    # Check for estimate-only mode
-    if os.environ.get("JOBBOT_ESTIMATE_ONLY", ""):
-        logger.info("Estimate-only mode enabled. Exiting now.")
-        return []
+    # Parse the plan
+    try:
+        # Try to pretty-print JSON if possible
+        formatted_plan = json.dumps(json.loads(plan_json), indent=2)
+        logger.info(f"Plan generated:\n{formatted_plan}")
 
-    # Search for jobs
+        # Parse plan into search pairs
+        plan_data = json.loads(plan_json)
+        search_plan = [JobSearchPair(company=p['company'], keyword=p['keyword']) for p in plan_data]
+
+        # Log some statistics about the plan
+        major_pairs = [p for p in search_plan if p.company in MAJOR_COMPANIES]
+        startup_pairs = [p for p in search_plan if p.company in STARTUP_COMPANIES]
+        logger.info(f"Plan contains {len(major_pairs)} major company pairs and {len(startup_pairs)} startup pairs")
+
+    except Exception as e:
+        logger.error(f"Error parsing plan: {e}")
+        # Fallback to a simple plan if parsing fails
+        logger.info("Using fallback search plan")
+        search_plan = []
+        # Add major companies
+        for i in range(min(majors_quota, len(MAJOR_COMPANIES))):
+            company = MAJOR_COMPANIES[i]
+            keyword = KEYWORDS[i % len(KEYWORDS)]
+            search_plan.append(JobSearchPair(company=company, keyword=keyword))
+
+        # Add startup companies
+        for i in range(min(startups_quota, len(STARTUP_COMPANIES))):
+            company = STARTUP_COMPANIES[i]
+            keyword = KEYWORDS[(i + 3) % len(KEYWORDS)]
+            search_plan.append(JobSearchPair(company=company, keyword=keyword))
+
+    # Execute search phase
+    logger.info("Executing search phase...")
+
+    # Track found jobs
     major_jobs = []
     startup_jobs = []
+    validated_urls = set()  # Track URLs we've already validated
 
-    # Get company list limit
-    company_list_limit = cfg.get("company_list_limit", 10)
+    # Search each pair
+    with Timer("Job searching", logger):
+        for i, pair in enumerate(search_plan, 1):
+            company_type = "Major" if pair.company in MAJOR_COMPANIES else "Startup"
 
-    with Timer("Overall job search", logger):
-        if cfg["majors"] > 0:
-            major_jobs = search_major_companies_with_responses(
-                count=cfg["majors"],
-                model=model,
-                logger=logger,
-                limit=company_list_limit,
-            )
-            logger.info(f"Found {len(major_jobs)} major company jobs")
+            # Skip if we already have enough jobs of this type
+            if company_type == "Major" and len(major_jobs) >= majors_quota:
+                logger.debug(f"Skipping {pair.company} - major quota reached")
+                continue
+            if company_type == "Startup" and len(startup_jobs) >= startups_quota:
+                logger.debug(f"Skipping {pair.company} - startup quota reached")
+                continue
 
-            # Ensure has_apply field exists for compatibility
-            for job in major_jobs:
-                job["has_apply"] = True
+            search_start_time = time.time()
+            logger.info(f"Search {i}/{len(search_plan)}: {pair.keyword} jobs at {pair.company} ({company_type})")
 
-        if cfg["startups"] > 0:
-            startup_jobs = search_startup_companies_with_responses(
-                count=cfg["startups"],
-                model=model,
-                logger=logger,
-                limit=company_list_limit,
-            )
-            logger.info(f"Found {len(startup_jobs)} startup jobs")
+            # Create search query
+            search_query = f"{pair.company} {pair.keyword} jobs careers software engineering apply"
 
-            # Ensure has_apply field exists for compatibility
-            for job in startup_jobs:
-                job["has_apply"] = True
+            try:
+                # Execute search
+                with Timer(f"Searching for {pair.company} {pair.keyword} jobs", logger):
+                    search_start_time = time.time()
+                    search_result = await Runner.run(
+                        searcher,
+                        input=f"Find {pair.keyword} jobs at {pair.company} ({company_type}) with web search. Search query: {search_query}"
+                    )
+                    search_output = search_result.final_output
+                    search_duration = time.time() - search_start_time
+
+                    # Track search step in visualizer
+                    try:
+                        # Get token information if available
+                        tokens_used = {}
+                        if hasattr(search_result, 'tokens_in') and hasattr(search_result, 'tokens_out'):
+                            tokens_used = {"input": search_result.tokens_in, "output": search_result.tokens_out}
+                        elif hasattr(search_result, 'input_tokens') and hasattr(search_result, 'output_tokens'):
+                            tokens_used = {"input": search_result.input_tokens, "output": search_result.output_tokens}
+
+                        visualizer.track_agent_call(
+                            agent_name="Searcher",
+                            input_text=f"Find {pair.keyword} jobs at {pair.company}",
+                            output_text=f"Found {len(search_output[:100])}... characters of results",
+                            duration=search_duration,
+                            tokens_used=tokens_used,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to track search visualization: {e}")
+
+                # Process results, if any
+                if search_output:
+                    # Process through processor agent
+                    with Timer(f"Processing job results for {pair.company}", logger):
+                        process_start_time = time.time()
+                        process_result = await Runner.run(
+                            processor,
+                            input=f"Process these job search results: {search_output[:10000]}"
+                        )
+                        processor_output = process_result.final_output
+                        process_duration = time.time() - process_start_time
+
+                        # Track processing step in visualizer
+                        try:
+                            # Get token information if available
+                            tokens_used = {}
+                            if hasattr(process_result, 'tokens_in') and hasattr(process_result, 'tokens_out'):
+                                tokens_used = {"input": process_result.tokens_in, "output": process_result.tokens_out}
+                            elif hasattr(process_result, 'input_tokens') and hasattr(process_result, 'output_tokens'):
+                                tokens_used = {"input": process_result.input_tokens, "output": process_result.output_tokens}
+
+                            visualizer.track_agent_call(
+                                agent_name="Processor",
+                                input_text=f"Process {pair.company} job results",
+                                output_text=processor_output[:100] + "...",
+                                duration=process_duration,
+                                tokens_used=tokens_used,
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to track processor visualization: {e}")
+
+                    # Extract jobs from processor output
+                    try:
+                        # Parse JSON output from processor
+                        if processor_output and len(processor_output.strip()) > 5:
+                            # Try to normalize JSON if needed
+                            if not processor_output.strip().startswith("["):
+                                if processor_output.strip().startswith("{"):
+                                    processor_output = f"[{processor_output}]"
+                                else:
+                                    # Try to extract JSON
+                                    json_match = re.search(r'\[\s*{.*?}\s*\]', processor_output, re.DOTALL)
+                                    if json_match:
+                                        processor_output = json_match.group(0)
+                                    else:
+                                        # Last resort - try to wrap whatever we got
+                                        processor_output = f"[{processor_output}]"
+
+                            # Parse normalized JSON
+                            job_data = json.loads(processor_output)
+
+                            # Process job listings
+                            if isinstance(job_data, list) and len(job_data) > 0:
+                                logger.info(f"Found {len(job_data)} potential jobs for {pair.company}")
+
+                                for job in job_data:
+                                    if not isinstance(job, dict):
+                                        continue
+
+                                    # Ensure minimum required fields exist
+                                    if all(key in job for key in ["title", "company", "url"]):
+                                        # Set company type
+                                        job["type"] = company_type
+                                        job["found_date"] = time.strftime("%Y-%m-%d")
+
+                                        # Skip if we've already processed this URL
+                                        if job["url"] in validated_urls:
+                                            logger.debug(f"Skipping duplicate URL: {job['url']}")
+                                            continue
+
+                                        # Add to the set of validated URLs
+                                        validated_urls.add(job["url"])
+
+                                        # First do basic URL validation
+                                        basic_valid = await validate_job_url(job["url"])
+
+                                        if not basic_valid:
+                                            logger.info(f"Skipped job: {job.get('title', 'Unknown')} - URL failed basic validation")
+                                            continue
+
+                                        # Verify URL if web verification is enabled
+                                        if use_web_verification:
+                                            try:
+                                                verify_start_time = time.time()
+                                                verification_result = await verify_job_url(job["url"], use_web_search=True)
+                                                job["has_apply"] = verification_result
+                                                verify_duration = time.time() - verify_start_time
+
+                                                # Track verification in visualizer
+                                                visualizer.track_agent_call(
+                                                    agent_name="URL Validator",
+                                                    input_text=f"Verify URL: {job['url']}",
+                                                    output_text=f"Valid: {verification_result}",
+                                                    duration=verify_duration,
+                                                    tokens_used={},
+                                                )
+
+                                                # Skip job if URL verification failed
+                                                if not verification_result:
+                                                    logger.info(f"Skipped job: {job.get('title', 'Unknown')} - URL failed web verification")
+                                                    continue
+
+                                            except Exception as ve:
+                                                logger.warning(f"URL verification failed: {ve}")
+                                                job["has_apply"] = False
+                                                continue
+                                        else:
+                                            # Use agent-based verification as a fallback
+                                            try:
+                                                verify_start_time = time.time()
+                                                verify_result = await Runner.run(
+                                                    verifier,
+                                                    input=f"Verify this job URL: {job['url']}"
+                                                )
+                                                verification = verify_result.final_output.lower().strip() == "true"
+                                                job["has_apply"] = verification
+                                                verify_duration = time.time() - verify_start_time
+
+                                                # Track verification step in visualizer
+                                                try:
+                                                    # Get token information if available
+                                                    tokens_used = {}
+                                                    if hasattr(verify_result, 'tokens_in') and hasattr(verify_result, 'tokens_out'):
+                                                        tokens_used = {"input": verify_result.tokens_in, "output": verify_result.tokens_out}
+                                                    elif hasattr(verify_result, 'input_tokens') and hasattr(verify_result, 'output_tokens'):
+                                                        tokens_used = {"input": verify_result.input_tokens, "output": verify_result.output_tokens}
+
+                                                    visualizer.track_agent_call(
+                                                        agent_name="Verifier",
+                                                        input_text=f"Verify URL: {job['url']}",
+                                                        output_text=f"Valid: {verification}",
+                                                        duration=verify_duration,
+                                                        tokens_used=tokens_used,
+                                                    )
+                                                except Exception as e:
+                                                    logger.warning(f"Failed to track verifier visualization: {e}")
+
+                                                # Skip job if verification failed
+                                                if not verification:
+                                                    logger.info(f"Skipped job: {job.get('title', 'Unknown')} - URL failed agent verification")
+                                                    continue
+
+                                            except Exception as ve:
+                                                logger.warning(f"Agent verification failed: {ve}")
+                                                # Use basic URL pattern check as last resort
+                                                job_url = job['url'].lower()
+                                                valid_patterns = [
+                                                    "jobs.", "careers.", "apply.", "greenhouse.io",
+                                                    "lever.co", "workday.com", "linkedin.com/jobs",
+                                                    "indeed.com", "glassdoor.com", "/job/", "/jobs/"
+                                                ]
+                                                job["has_apply"] = any(pattern in job_url for pattern in valid_patterns)
+
+                                                if not job["has_apply"]:
+                                                    logger.info(f"Skipped job: {job.get('title', 'Unknown')} - URL failed pattern verification")
+                                                    continue
+
+                                        # Validation successful - add the job
+                                        # Try to validate as JobListing model
+                                        try:
+                                            job_listing = JobListing(**job)
+
+                                            # Add to appropriate list based on company type
+                                            if company_type == "Major":
+                                                major_jobs.append(job_listing.model_dump())
+                                                logger.info(f"Added MAJOR job: {job_listing.title} at {job_listing.company}")
+                                            else:
+                                                startup_jobs.append(job_listing.model_dump())
+                                                logger.info(f"Added STARTUP job: {job_listing.title} at {job_listing.company}")
+                                        except Exception as e:
+                                            logger.warning(f"Invalid job format: {e}")
+
+                    except Exception as e:
+                        logger.error(f"Error processing jobs: {e}")
+
+            except Exception as e:
+                logger.error(f"Search error: {e}")
+
+            # Log search completion and duration
+            search_duration = time.time() - search_start_time
+            logger.info(f"Search for {pair.company} completed in {search_duration:.2f}s")
+
+    # Log statistics about verified jobs
+    if len(major_jobs) < majors_quota:
+        logger.warning(f"Only found {len(major_jobs)}/{majors_quota} verified major company jobs")
+
+    if len(startup_jobs) < startups_quota:
+        logger.warning(f"Only found {len(startup_jobs)}/{startups_quota} verified startup jobs")
 
     # Combine results
-    all_jobs = major_jobs[: cfg["majors"]] + startup_jobs[: cfg["startups"]]
-    logger.info(f"Total jobs found: {len(all_jobs)}")
+    all_jobs = major_jobs[:majors_quota] + startup_jobs[:startups_quota]
 
-    # Generate visualizations
-    visualizer = get_visualizer()
+    # Add sequence numbers
+    for i, job in enumerate(all_jobs, 1):
+        job["#"] = i
+
+    # Log results
+    logger.info(f"Search complete! Found {len(all_jobs)} VERIFIED jobs ({len(major_jobs)} major, {len(startup_jobs)} startup)")
+
+    # Generate token usage report
     try:
-        # Track overall API usage for visualization
-        api_duration = time.time() - api_start_time
-        token_usage = {cfg.get("model", "gpt-4o"): tokens_estimate}
+        total_tokens = sum(agent_usage.tokens_per_model.values())
 
-        # Track search as a component step
-        visualizer.track_agent_call(
-            agent_name="JobSearch",
-            input_text=f"Search for {cfg['majors']} major and {cfg['startups']} startup jobs",
-            output_text=f"Found {len(all_jobs)} jobs",
-            duration=api_duration,
-            tokens_used=token_usage,
+        # Calculate cost using our token monitor rates
+        token_monitor = TokenMonitor(cfg, logger)
+        total_cost = sum(
+            (tokens / 1000) * token_monitor.get_model_rate(model_name)
+            for model_name, tokens in agent_usage.tokens_per_model.items()
         )
 
-        # Generate visualization files in logs/visuals
-        timeline_file = visualizer.generate_timeline_diagram(
-            title=f"Job Search Execution Timeline ({cfg.get('model', 'gpt-4o')})"
-        )
-        report_file = visualizer.generate_report()
-
-        logger.info(f"Generated visualization timeline: {timeline_file}")
-        logger.info(f"Generated execution report: {report_file}")
+        logger.info("\nToken usage statistics:")
+        for model_name, tokens in agent_usage.tokens_per_model.items():
+            model_cost = (tokens / 1000) * token_monitor.get_model_rate(model_name)
+            logger.info(f"  - {model_name}: {tokens:,} tokens (${model_cost:.4f})")
+        logger.info(f"Total: {total_tokens:,} tokens (${total_cost:.4f})")
     except Exception as e:
-        logger.warning(f"Failed to generate visualizations: {e}")
+        logger.warning(f"Could not generate token usage report: {e}")
 
     return all_jobs
 
+def search_with_multi_agents(cfg, logger) -> List[Dict[str, str]]:
+    """
+    Legacy wrapper for backward compatibility with old scripts
+
+    Args:
+        cfg: Configuration dictionary
+        logger: Logger instance
+
+    Returns:
+        List of job dictionaries
+    """
+    logger.info("Using multi-agent search workflow")
+    jobs = asyncio.run(gather_jobs_with_multi_agents(cfg, logger))
+    return jobs
 
 def save(rows, logger):
     """Save results to CSV and Markdown files in the configured RESULTS_DIR"""
@@ -779,137 +1035,175 @@ def save(rows, logger):
     return
 
 
-def parse():
-    """Parse command line arguments"""
-    parser = argparse.ArgumentParser(
-        description="Deep Job Search: OpenAI powered job search tool for finding software engineering jobs in video/streaming companies"
-    )
-    parser.add_argument(
-        "--majors", type=int, default=10, help="Number of major company jobs to find"
-    )
-    parser.add_argument(
-        "--startups",
-        type=int,
-        default=10,
-        help="Number of startup company jobs to find",
-    )
-    parser.add_argument(
-        "--sample",
-        action="store_true",
-        help="Run with minimal settings (2 major, 2 startup jobs)",
-    )
-    parser.add_argument(
-        "--max-tokens", type=int, default=100000, help="Max tokens to use"
-    )
-    parser.add_argument(
-        "--budget", type=float, help="Maximum cost in USD (exit if exceeded)"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Skip cost confirmation prompt"
-    )
-    parser.add_argument(
-        "--log-level", default="INFO", help="Logging level (default: INFO)"
-    )
-    parser.add_argument("--log-file", help="Log to this file in addition to console")
-    parser.add_argument("--trace", action="store_true", help="Enable trace output")
-    parser.add_argument(
-        "--use-web-verify",
-        action="store_true",
-        help="Use web search for URL verification",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o",
-        help="Model to use for Responses API implementation (default: gpt-4o)",
-    )
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        default=True,
-        help="Generate visualization diagrams (default: True)",
-    )
-    parser.add_argument(
-        "--no-visualize",
-        action="store_false",
-        dest="visualize",
-        help="Disable visualization generation",
-    )
-    parser.add_argument(
-        "--company-list-limit",
-        type=int,
-        default=10,
-        help="Maximum number of companies to list in prompts (default: 10)",
-    )
+def parse_args():
+    """
+    Legacy argument parser for backward compatibility
 
-    # No legacy arguments needed
+    Returns:
+        dict: Configuration dictionary from command line arguments
+    """
+    parser = argparse.ArgumentParser(description="Deep Job Search - Find tech jobs with AI")
+
+    # Core parameters
+    parser.add_argument("-m", "--majors", type=int, default=10, help="Number of major company jobs to find")
+    parser.add_argument("-s", "--startups", type=int, default=10, help="Number of startup company jobs to find")
+    parser.add_argument("--model", type=str, default="gpt-4o", help="Model to use (gpt-4o, gpt-4, gpt-3.5-turbo)")
+    parser.add_argument("--max-tokens", type=int, default=None, help="Max tokens for API calls")
+
+    # Options
+    parser.add_argument("--company-list", type=str, help="CSV file with custom companies")
+    parser.add_argument("--company-list-limit", type=int, default=20, help="Limit of companies to use from list")
+    parser.add_argument("--fallback-enabled", action="store_true", help="Enable fallback job generation (DEPRECATED)")
+    parser.add_argument("--web-verify", action="store_true", help="Use web search to verify job URLs")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode with more logging")
+    parser.add_argument("--save-raw", action="store_true", help="Save raw API responses")
+    parser.add_argument("--use-cache", action="store_true", help="Use cached API responses if available")
+    parser.add_argument("--visualize", action="store_true", default=True, help="Enable agent visualization")
 
     args = parser.parse_args()
 
-    # Handle sample mode
-    if args.sample:
-        args.majors = 2
-        args.startups = 2
-        args.log_level = "DEBUG"
-
-    # Convert to config dict
+    # Set up configuration dictionary
     cfg = {
         "majors": args.majors,
         "startups": args.startups,
-        "max_tokens": args.max_tokens,
-        "budget": args.budget,
-        "force": args.force,
-        "use_web_verify": args.use_web_verify,
-        "log_level": args.log_level,
-        "log_file": args.log_file,
-        "trace": args.trace,
         "model": args.model,
         "company_list_limit": args.company_list_limit,
+        "fallback_enabled": False,  # Force disable fallback
+        "use_web_verify": args.web_verify,
+        "validate_urls": True,  # Always validate URLs
+        "debug": args.debug,
+        "save_raw_responses": args.save_raw,
+        "use_cache": args.use_cache,
+        "visualize": args.visualize,
+        "log_level": "DEBUG" if args.debug else "INFO",
+        "log_file": "logs/debug/deep_job_search.log"
     }
+
+    if args.max_tokens:
+        cfg["max_tokens"] = args.max_tokens
+
+    # Set up company list if provided
+    if args.company_list:
+        cfg["company_list"] = args.company_list
 
     return cfg
 
 
 def main():
-    """Main function to run the job search"""
-    # Parse arguments
-    cfg = parse()
+    """
+    Main entry point for the job search script
+    """
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Deep Job Search - Find tech jobs with AI")
 
-    # Configure results directory for Docker compatibility
-    global RESULTS_DIR
-    # Check if we're running in a Docker container
-    if os.environ.get("RUNNING_IN_CONTAINER") == "1":
-        # In Docker, results should go to /app/results which is mounted to the host
-        RESULTS_DIR = Path("/app/results")
-    else:
-        # Otherwise use local results directory
-        RESULTS_DIR = Path("results")
+    # Core parameters
+    parser.add_argument("-m", "--majors", type=int, default=10, help="Number of major company jobs to find")
+    parser.add_argument("-s", "--startups", type=int, default=10, help="Number of startup company jobs to find")
+    parser.add_argument("--model", type=str, default="gpt-4o", help="Model to use (gpt-4o, gpt-4, gpt-3.5-turbo)")
+    parser.add_argument("--output", type=str, default="results/jobs.csv", help="Output file for jobs")
+    parser.add_argument("--max-tokens", type=int, default=None, help="Max tokens for API calls")
 
-    # Create required directories
-    RESULTS_DIR.mkdir(exist_ok=True, parents=True)
+    # Validation options
+    parser.add_argument("--validate-urls", action="store_true", default=True, help="Enable URL validation")
+    parser.add_argument("--web-verify", action="store_true", default=False, help="Use web search to verify job URLs")
+    parser.add_argument("--skip-validation", action="store_true", help="Skip all URL validation (not recommended)")
 
-    # Initialize logger
-    logger = setup_logger(level=cfg["log_level"], file=cfg["log_file"])
+    # Customization options
+    parser.add_argument("--company-list", type=str, help="CSV file with custom companies")
+    parser.add_argument("--company-list-limit", type=int, default=20, help="Limit of companies to use from list")
 
-    # Check if visualization is enabled
-    if cfg.get("visualize", True):
-        # Initialize visualizer if not already initialized
-        visuals_dir = Path("logs/visuals")
-        initialize_visualizer(visuals_dir)
+    # Developer options
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode with more logging")
+    parser.add_argument("--save-raw", action="store_true", help="Save raw API responses")
+    parser.add_argument("--use-cache", action="store_true", help="Use cached API responses if available")
 
-    # Log startup info
-    logger.info(f"deep_job_search starting with Python {sys.version}")
+    args = parser.parse_args()
 
-    # Check for estimate-only mode
-    if os.environ.get("JOBBOT_ESTIMATE_ONLY", ""):
-        logger.info("Estimate-only mode enabled. Exiting now.")
-        return 0
+    # Setup configuration
+    config = {
+        "majors": args.majors,
+        "startups": args.startups,
+        "model": args.model,
+        "company_list_limit": args.company_list_limit,
+        "use_web_verify": args.web_verify and not args.skip_validation,
+        "validate_urls": args.validate_urls and not args.skip_validation,
+        "save_raw_responses": args.save_raw,
+        "use_cache": args.use_cache,
+        "debug": args.debug,
+    }
 
-    # Log execution start
-    logger.info("Job search execution started")
+    if args.max_tokens:
+        config["max_tokens"] = args.max_tokens
+
+    # Create output directory if it doesn't exist
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Set up logging
+    logger = setup_logger(debug=args.debug)
+    logger.info("Starting Deep Job Search")
+
+    # Log configuration
+    logger.info(f"Configuration:")
+    for key, value in config.items():
+        logger.info(f"  {key}: {value}")
+
+    # Load custom company list if provided
+    if args.company_list:
+        try:
+            logger.info(f"Loading custom company list from {args.company_list}")
+            company_df = pd.read_csv(args.company_list)
+            if "Company" in company_df.columns:
+                update_company_lists(company_df["Company"].tolist(), config["company_list_limit"])
+                logger.info(f"Updated company lists with {len(company_df)} companies")
+            else:
+                logger.warning(f"Company column not found in {args.company_list}")
+        except Exception as e:
+            logger.error(f"Error loading company list: {e}")
+
+    # Initialize token monitor
+    token_monitor = TokenMonitor(config, logger)
 
     # Run the job search
-    if rows := search_with_responses(cfg, logger):
-        save(rows, logger)
+    try:
+        jobs = asyncio.run(gather_jobs_with_multi_agents(config, logger))
+
+        # Convert to DataFrame for output
+        if jobs:
+            jobs_df = pd.DataFrame(jobs)
+
+            # Save to CSV
+            jobs_df.to_csv(args.output, index=False)
+            logger.info(f"Saved {len(jobs)} jobs to {args.output}")
+
+            # Print summary
+            print("\n" + "=" * 50)
+            print(f"SEARCH COMPLETE: Found {len(jobs)} jobs")
+            print("-" * 50)
+            print(f"Major companies: {sum(1 for job in jobs if job['type'] == 'Major')}")
+            print(f"Startups: {sum(1 for job in jobs if job['type'] == 'Startup')}")
+            print(f"Output saved to: {args.output}")
+            print("=" * 50)
+
+            # Print token usage if available
+            if token_monitor.tokens > 0:
+                print(f"\nToken usage: {token_monitor.tokens:,}")
+                print(f"Estimated cost: ${token_monitor.cost:.4f}")
+
+            if len(jobs) < config["majors"] + config["startups"]:
+                print(f"\nNOTE: Found fewer jobs than requested. This is likely because:")
+                print(f" - Some job URLs failed validation (we only return verified jobs)")
+                print(f" - The search didn't find enough relevant jobs")
+                print(f"\nTry adjusting search keywords or enabling web verification with --web-verify")
+        else:
+            logger.warning("No jobs found")
+            print("\nNo jobs found. Try adjusting search parameters.")
+
+    except Exception as e:
+        logger.error(f"Error in job search: {e}")
+        traceback.print_exc()
+        print(f"\nError: {str(e)}")
+        return 1
 
     return 0
 

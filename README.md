@@ -1,6 +1,92 @@
 # Deep Job Search
 
-An OpenAI-powered tool for finding software engineering jobs in video/streaming companies.
+An AI-powered job search tool that uses OpenAI's GPT models to find software engineering jobs.
+
+## What's New: Improved Job Validation
+
+We've completely redesigned the job search process to focus on finding only real, validated job postings:
+
+- **URL Validation**: Multiple layers of validation ensure we only return real jobs
+- **Pattern Recognition**: Intelligent analysis of job listing URLs to filter out invalid links
+- **No Fake Jobs**: System no longer generates fallback fictional jobs when real ones aren't found
+- **Web Verification**: Optional web search verification of job URLs for higher quality results
+
+## Features
+
+- Multi-agent system with specialized planning, searching, processing, and verification
+- Finds jobs at both major tech companies and promising startups
+- Returns structured job data with titles, companies, and verified application URLs
+- Customizable search parameters (number of jobs, company type, etc.)
+- Detailed logging and visualization of the search process
+
+## Usage
+
+### Basic Usage
+
+Use the `run.sh` script to search for jobs:
+
+```bash
+./run.sh --majors 20 --startups 20
+```
+
+### Options
+
+- `-m, --majors COUNT`: Number of major company jobs to find (default: 10)
+- `-s, --startups COUNT`: Number of startup jobs to find (default: 10)
+- `--model MODEL`: Model to use (default: gpt-4o)
+- `--company-list FILE`: Custom CSV file with company names
+- `--no-web-verify`: Disable web verification (less accurate but faster)
+- `--debug`: Enable debug mode with more logging
+- `--output FILE`: Output file path (default: results/jobs.csv)
+
+### Example
+
+Find 15 major company jobs and 5 startup jobs with web verification:
+
+```bash
+./run.sh --majors 15 --startups 5
+```
+
+## Requirements
+
+- Python 3.9+
+- OpenAI API key (set as OPENAI_API_KEY environment variable)
+- Required Python packages (see requirements.txt)
+
+## Installation
+
+1. Clone this repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Set your OpenAI API key:
+   ```bash
+   export OPENAI_API_KEY=your-api-key
+   ```
+4. Run the job search: `./run.sh`
+
+## Understanding the Results
+
+The tool saves job results to a CSV file (default: `results/jobs.csv`) with fields:
+- `#`: Job number
+- `title`: Job title
+- `company`: Company name
+- `url`: URL to job application
+- `type`: "Major" or "Startup"
+- `has_apply`: Whether the job URL has been verified to contain an application
+- `found_date`: Date the job was found
+
+## Important Notes
+
+- **Quality vs. Quantity**: The tool prioritizes finding real jobs with working URLs over meeting quotas
+- **URL Validation**: All returned jobs have undergone URL validation to ensure they're real
+- **Web Verification**: The `--web-verify` option (enabled by default) uses web search to verify job URLs
+- **Finding Fewer Jobs**: If fewer jobs are found than requested, it's because:
+  1. Some job URLs failed validation (we only return verified jobs)
+  2. The search didn't find enough relevant jobs
+
+To improve results, try:
+1. Using different search keywords
+2. Specifying a custom company list
+3. Enabling web verification for more accurate results
 
 ## Using This Tool
 
