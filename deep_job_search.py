@@ -289,13 +289,24 @@ def parse_responses_output(response, logger):
             # If parsing table fails, use regex to find potential job listings
             logger.info("Falling back to regex pattern matching for job data")
             jobs = []
-            title_pattern = r'([A-Za-z\s\-–&]+) at ([A-Za-z\s\-–&]+)'
+
+            # Regex patterns for different job title formats
+            title_at_company_pattern = r'([A-Za-z\s\-–&]+) at ([A-Za-z\s\-–&]+)'
+            company_hiring_pattern = r'([A-Za-z\s\-–&]+) is hiring:?\s*([A-Za-z\s\-–&]+)'
             url_pattern = r'(https?://[^\s]+)'
 
-            title_matches = re.findall(title_pattern, result_text)
+            # Words to ignore as titles (false positives like action verbs)
+            ignore_words = ['apply', 'learn', 'more', 'view', 'click', 'check', 'see', 'visit', 'join']
+
+            # Find "<title> at <company>" matches
+            title_matches = re.findall(title_at_company_pattern, result_text)
             url_matches = re.findall(url_pattern, result_text)
 
             for i, (title, company) in enumerate(title_matches):
+                # Skip if the title is a common action verb (false positive)
+                if title.strip().lower() in ignore_words:
+                    continue
+
                 if i < len(url_matches):
                     url = url_matches[i]
                     job_type = "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
@@ -305,6 +316,26 @@ def parse_responses_output(response, logger):
                         "url": url,
                         "type": job_type
                     })
+
+            # Also find "<company> is hiring: <title>" matches
+            hiring_matches = re.findall(company_hiring_pattern, result_text)
+            start_idx = len(jobs)
+
+            for i, (company, title) in enumerate(hiring_matches):
+                # Skip if the title is a common action verb (false positive)
+                if title.strip().lower() in ignore_words:
+                    continue
+
+                if start_idx + i < len(url_matches):
+                    url = url_matches[start_idx + i]
+                    job_type = "Major" if company.strip() in MAJOR_COMPANIES else "Startup"
+                    jobs.append({
+                        "title": title.strip(),
+                        "company": company.strip(),
+                        "url": url,
+                        "type": job_type
+                    })
+
             logger.info(f"Found {len(jobs)} jobs using regex pattern matching")
             return jobs
 
