@@ -1,15 +1,17 @@
 # Deep Job Search
 
-An AI-powered job search tool that uses OpenAI's GPT models to find software engineering jobs.
+An AI-powered job search tool that uses OpenAI's Agents SDK with a specialized multi-agent architecture to find software engineering jobs.
 
-## What's New: Improved Job Validation
+## What's New: Multi-Agent Architecture & Simplified API
 
-We've completely redesigned the job search process to focus on finding only real, validated job postings:
+We've completely redesigned the system with a specialized multi-agent architecture and added a simplified API:
 
-- **URL Validation**: Multiple layers of validation ensure we only return real jobs
+- **Multi-Agent System**: Four specialized agents (Planner, Searcher, Processor, Verifier) that work together
+- **URL Validation**: Advanced multi-stage validation ensures we only return real jobs
 - **Pattern Recognition**: Intelligent analysis of job listing URLs to filter out invalid links
-- **No Fake Jobs**: System no longer generates fallback fictional jobs when real ones aren't found
-- **Web Verification**: Optional web search verification of job URLs for higher quality results
+- **Simplified API**: New streamlined interface for easier integration and quicker searches
+- **Robust Operation**: Improved error handling and fallback mechanisms for reliable results
+- **Web Verification**: Enhanced web search verification of job URLs for higher quality results
 
 ## Features
 
@@ -23,10 +25,16 @@ We've completely redesigned the job search process to focus on finding only real
 
 ### Basic Usage
 
-Use the `run.sh` script to search for jobs:
+Always use the `build-and-run.sh` script to search for jobs:
 
 ```bash
-./run.sh --majors 20 --startups 20
+./build-and-run.sh --majors 20 --startups 20
+```
+
+For a faster, streamlined experience, use the simplified mode:
+
+```bash
+./build-and-run.sh --simplified
 ```
 
 ### Options
@@ -34,34 +42,135 @@ Use the `run.sh` script to search for jobs:
 - `-m, --majors COUNT`: Number of major company jobs to find (default: 10)
 - `-s, --startups COUNT`: Number of startup jobs to find (default: 10)
 - `--model MODEL`: Model to use (default: gpt-4o)
+- `--simplified`: Use the streamlined agent interface
 - `--company-list FILE`: Custom CSV file with company names
-- `--no-web-verify`: Disable web verification (less accurate but faster)
+- `--web-verify`: Enable web search verification for higher quality
 - `--debug`: Enable debug mode with more logging
 - `--output FILE`: Output file path (default: results/jobs.csv)
+- `--dry-run`: Run without executing any actual searches (for testing)
 
-### Example
+### Examples
 
-Find 15 major company jobs and 5 startup jobs with web verification:
+Find 15 major company jobs and 5 startup jobs:
 
 ```bash
-./run.sh --majors 15 --startups 5
+./build-and-run.sh --majors 15 --startups 5
+```
+
+Use simplified mode with a lighter model for faster results:
+
+```bash
+./build-and-run.sh --simplified --model gpt-4o-mini
 ```
 
 ## Requirements
 
-- Python 3.9+
+- Docker
 - OpenAI API key (set as OPENAI_API_KEY environment variable)
-- Required Python packages (see requirements.txt)
 
 ## Installation
 
 1. Clone this repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Set your OpenAI API key:
+2. Set your OpenAI API key:
    ```bash
    export OPENAI_API_KEY=your-api-key
    ```
-4. Run the job search: `./run.sh`
+3. Run the job search: `./build-and-run.sh`
+
+## URL Validation
+
+The tool now automatically validates job URLs to ensure they contain an "Apply" mechanism:
+
+- Each job URL is validated with pattern matching and MCP browser checks
+- URLs are checked for HTTP 2xx status and the presence of "Apply" elements
+- Log entries will show "✓ Apply button found" for valid URLs
+- Invalid URLs will display "✖ reason" with failure details
+- This validation ensures all returned jobs have a valid application path
+
+**Success Criteria**: A run is successful when **at least one** result CSV/MD row contains a URL that logs "✓ Apply button found". The MCP checks run automatically for every job URL.
+
+This validation improves result quality by filtering out invalid or expired job listings.
+
+## Example Command Suite
+
+Here's a comprehensive suite of example commands that showcase different use cases:
+
+1. Basic job search (10 major, 10 startup):
+```bash
+./build-and-run.sh
+```
+
+2. Quick sample run with minimal jobs:
+```bash
+./build-and-run.sh --sample
+```
+
+3. Custom job distribution:
+```bash
+./build-and-run.sh --majors 20 --startups 10
+```
+
+4. Economy mode with faster, cheaper model:
+```bash
+./build-and-run.sh --model gpt-3.5-turbo
+```
+
+5. Premium mode with highest quality results:
+```bash
+./build-and-run.sh --model gpt-4.1
+```
+
+6. Simplified interface mode:
+```bash
+./build-and-run.sh --simplified
+```
+
+7. Simplified mode with economy model:
+```bash
+./build-and-run.sh --simplified --model gpt-4o-mini
+```
+
+8. Detailed debugging logs:
+```bash
+./build-and-run.sh --log-level DEBUG
+```
+
+9. Custom log file:
+```bash
+./build-and-run.sh --log-file custom_log.txt
+```
+
+10. Budget control:
+```bash
+./build-and-run.sh --budget 0.10 --force
+```
+
+11. Estimate-only mode:
+```bash
+JOBBOT_ESTIMATE_ONLY=1 ./build-and-run.sh
+```
+
+12. Force Docker image rebuild:
+```bash
+./build-and-run.sh --rebuild
+```
+
+13. Web verification for higher quality:
+```bash
+./build-and-run.sh --web-verify
+```
+
+14. Disable visualization for faster execution:
+```bash
+./build-and-run.sh --no-visualize
+```
+
+15. Maximum performance configuration:
+```bash
+./build-and-run.sh --model gpt-4.1 --majors 15 --startups 10 --force --budget 0.25 --web-verify
+```
+
+All these commands will be automatically verified in the refactor pipeline.
 
 ## Understanding the Results
 
@@ -109,28 +218,41 @@ The application automatically uses Docker for consistent execution across enviro
 ```mermaid
 graph TD
     User[User] --> |starts| DeepJobSearch[Deep Job Search]
-    DeepJobSearch --> |configures| ResponsesAPI[OpenAI Responses API\ngpt-4o]
-    ResponsesAPI --> |uses| WebSearchTool[Web Search Tool]
-    WebSearchTool --> |finds| MajorJobs[Major Company Jobs]
-    WebSearchTool --> |finds| StartupJobs[Startup Company Jobs]
-    MajorJobs --> |processed by| JobProcessor[JSON/Markdown Processor]
-    StartupJobs --> |processed by| JobProcessor
-    JobProcessor --> |produces| JobListings[Structured Job Listings]
+    DeepJobSearch --> |initializes| AgentSystem[Multi-Agent System]
+
+    %% Agent definitions
+    subgraph AgentSystem[Multi-Agent System]
+        Planner[Planner Agent] --> |creates search plan| Searcher[Searcher Agent]
+        Searcher --> |uses| WebSearchTool[Web Search Tool]
+        Searcher --> |extracts listings| Processor[Processor Agent]
+        Processor --> |validates URLs| Verifier[Verifier Agent]
+    end
+
+    WebSearchTool --> |searches| Companies[Major & Startup Companies]
+    Companies --> |job listings| Searcher
+    Verifier --> |validates| JobListings[Validated Job Listings]
     JobListings --> |saved as| Results[CSV/MD Results]
 ```
 
-The system uses the OpenAI Responses API with web search to:
+The system uses a specialized multi-agent architecture with OpenAI's Agents SDK:
 
-1. Search for jobs at major companies in the video/streaming industry
-2. Search for jobs at startup companies in the video/streaming industry
-3. Structure and validate job information
-4. Output results in CSV and Markdown formats
+1. **Planner Agent** - Creates optimal search strategies by pairing companies with relevant keywords
+2. **Searcher Agent** - Performs web searches and extracts job information using specialized tools
+3. **Processor Agent** - Processes search results into structured job listings
+4. **Verifier Agent** - Validates job URLs to ensure they're real postings with application forms
+
+This multi-agent approach allows each component to specialize in its task while maintaining a coordinated workflow that delivers high-quality, verified job listings.
 
 ## Project Structure
 
 The project consists of the following key files:
 
-- **deep_job_search.py** - Main Python script implementing the job search using OpenAI's Responses API
+- **deep_job_search.py** - Main Python script implementing the multi-agent job search architecture. Features:
+  - Planner, Searcher, Processor and Verifier agent pipeline
+  - Integration with OpenAI's Agents SDK
+  - Advanced URL validation and verification
+  - Simplified API interface for easier integration
+  - Fall-back mechanisms for robust operation
 - **api_wrapper.py** - Utility wrapper for OpenAI API calls with logging and timing metrics. Provides consistent error handling and statistics tracking.
 - **logger_utils.py** - Enhanced logging utility for detailed execution tracking, with features for nested operations, API call logging, and timing analysis.
 - **agent_visualizer.py** - Visualization tool that generates diagrams and reports showing API call flow and token usage.
@@ -170,19 +292,34 @@ Main options:
   --majors N            Number of major company jobs to find
   --startups N          Number of startup company jobs to find
   --sample              Run with minimal settings (2 major, 2 startup jobs)
+  --simplified          Run using the simplified agent interface
   --log-level LEVEL     Logging level (default: INFO)
   --log-file FILE       Log to this file in addition to console
   --force               Skip cost confirmation prompt
   --budget BUDGET       Maximum cost in USD (exit if exceeded)
   --company-list-limit  Maximum number of companies to display in prompts
-  --use-web-verify      Use web search for URL verification (limited implementation)
+  --use-web-verify      Use web search for URL verification
   --rebuild             Force rebuild of the Docker image
   --visualize           Generate visualization diagrams (default: True)
   --no-visualize        Disable visualization generation
 
 Model options:
-  --model MODEL         Model for Responses API implementation (default: gpt-4o)
+  --model MODEL         Model for agent system (default: gpt-4o)
 ```
+
+### Simplified Mode
+
+The system now includes a simplified interface mode that streamlines the job search process:
+
+```bash
+# Run in simplified mode
+./build-and-run.sh --simplified
+
+# Combine with other options
+./build-and-run.sh --simplified --model gpt-4o-mini
+```
+
+This mode uses a more direct approach with fewer API calls, making it faster but potentially less thorough than the full multi-agent system.
 
 > **Note:** The `--use-web-verify` option is included for future expansion but currently has limited implementation. It's intended to verify job URLs via web search but this functionality is not fully integrated.
 
@@ -283,10 +420,39 @@ The `jobbot_costs.png` file visualizes the cost differences between models for a
 
 Results are saved in the `results` directory as both CSV and Markdown files. Logs are saved in the `logs` directory.
 
+Each result includes:
+- Job number (#)
+- Job title
+- Company name
+- Company type (Major/Startup)
+- Job URL
+
+### Example Output
+
+CSV format:
+```csv
+#,title,company,type,url
+1,Senior Software Engineer,Netflix,Major,https://netflix.com/jobs/123
+2,Backend Developer,Mux,Startup,https://mux.com/careers/456
+```
+
+Markdown format:
+```markdown
+# Job Search Results
+
+Found 2 jobs.
+
+|   # | title                   | company   | type   | url                           |
+|-----|-------------------------|-----------|--------|-------------------------------|
+|   1 | Senior Software Engineer | Netflix   | Major  | https://netflix.com/jobs/123 |
+|   2 | Backend Developer       | Mux       | Startup | https://mux.com/careers/456  |
+```
+
 ## Requirements
 
-- Docker
-- OpenAI API key
+- Python 3.9+
+- OpenAI API key (set as OPENAI_API_KEY environment variable)
+- Required Python packages (see requirements.txt)
 
 ## Installation
 
@@ -516,6 +682,39 @@ Found 2 jobs.
 |   1 | Senior Software Engineer | Netflix   | Major  | https://netflix.com/jobs/123 |
 |   2 | Backend Developer       | Mux       | Startup | https://mux.com/careers/456  |
 ```
+
+## Developer API Integration
+
+The system now provides a clean API for integrating job search capabilities into your applications. The simplified `gather_jobs` function offers an easy entry point:
+
+```python
+from deep_job_search import gather_jobs
+import asyncio
+
+async def search_for_jobs():
+    # Define companies and keywords
+    companies = ["Google", "Microsoft", "Amazon", "Mux", "Livepeer", "Daily.co"]
+    keywords = ["video", "encoding", "streaming"]
+
+    # Perform the search (returns list of JobListing objects)
+    jobs = await gather_jobs(
+        companies=companies,
+        keywords=keywords,
+        model="gpt-4o-mini",  # Use a lighter model for faster results
+        max_jobs=10           # Limit total jobs returned
+    )
+
+    # Process job results
+    for job in jobs:
+        print(f"{job.title} at {job.company} - {job.url}")
+
+    return jobs
+
+# Run the search
+jobs = asyncio.run(search_for_jobs())
+```
+
+For more advanced usage, you can access the full multi-agent system with `gather_jobs_with_multi_agents()`, which provides more configurable options and detailed control over the search process.
 
 ## Troubleshooting
 

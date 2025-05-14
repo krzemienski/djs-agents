@@ -41,41 +41,58 @@ fi
 # Build the Docker image if needed
 if [ "$REBUILD" = true ]; then
   echo "Building Docker image..."
-  docker build -t djso .
+  docker build --pull -t djso .
   touch logs/debug/.last_build
 fi
 
 # Check if output arg is already specified
 HAS_OUTPUT=false
+# Check if simplified flag is present
+HAS_SIMPLIFIED=false
+# Check if dry-run flag is present
+IS_DRY_RUN=false
 for arg in "$@"; do
   if [[ "$arg" == "--output" ]]; then
     HAS_OUTPUT=true
-    break
+  fi
+  if [[ "$arg" == "--simplified" ]]; then
+    HAS_SIMPLIFIED=true
+  fi
+  if [[ "$arg" == "--dry-run" ]]; then
+    IS_DRY_RUN=true
   fi
 done
 
-# Build the command
-CMD="./run.sh"
-for arg in "$@"; do
-  CMD="$CMD \"$arg\""
-done
+# Build the argument array for run.sh
+ARGS=("$@")
 
 # Add output argument if needed
 if [ "$HAS_OUTPUT" = false ]; then
-  CMD="$CMD --output results/jobs.csv"
+  ARGS+=("--output" "results/jobs.csv")
 fi
 
 # Run the tool
 echo "Running Deep Job Search in Docker container..."
-echo "Command: $CMD"
 
-# Execute the container
+# Print message for dry run
+if [ "$IS_DRY_RUN" = true ]; then
+  echo "DRY RUN MODE: Testing pipeline without making API calls"
+fi
+
+# Prepare arguments as a string for docker command
+ARG_STRING=""
+for arg in "${ARGS[@]}"; do
+  ARG_STRING="$ARG_STRING \"$arg\""
+done
+
+# Execute the container with the arguments
 docker run --rm \
   -e OPENAI_API_KEY \
   -e RUNNING_IN_CONTAINER=1 \
   -v "$(pwd)/results:/app/results" \
   -v "$(pwd)/logs:/app/logs" \
-  djso /bin/bash -c "$CMD"
+  --entrypoint /bin/bash \
+  djso -c "cd /app && ./run.sh $ARG_STRING"
 
 # Check exit code
 STATUS=$?

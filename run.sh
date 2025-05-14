@@ -15,6 +15,8 @@ COMPANY_LIST=""
 WEB_VERIFY="--web-verify" # Enable web verification by default
 DEBUG=""
 OUTPUT="results/jobs.csv"
+# Simplified mode removed
+DRY_RUN=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -47,9 +49,17 @@ while [[ $# -gt 0 ]]; do
       OUTPUT="$2"
       shift 2
       ;;
+# Simplified mode has been removed
+# Run full multi-agent search only
+    --dry-run)
+      DRY_RUN="--dry-run"
+      shift
+      ;;
+    # --use-real-urls flag removed
+# Always use real URLs by default
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [-m|--majors COUNT] [-s|--startups COUNT] [--model MODEL] [--company-list FILE] [--no-web-verify] [--debug] [--output FILE]"
+      echo "Usage: $0 [-m|--majors COUNT] [-s|--startups COUNT] [--model MODEL] [--company-list FILE] [--no-web-verify] [--debug] [--output FILE] [--dry-run]"
       exit 1
       ;;
   esac
@@ -62,6 +72,10 @@ echo "- Startups: $STARTUP_COUNT"
 echo "- Model: $MODEL"
 echo "- Web verification: $([ -n "$WEB_VERIFY" ] && echo "Enabled" || echo "Disabled")"
 echo "- Output: $OUTPUT"
+echo "- Mode: Full multi-agent"
+if [ -n "$DRY_RUN" ]; then
+  echo "- Dry run: Yes (no API calls will be made)"
+fi
 echo "========================="
 
 # Run the job search
@@ -72,6 +86,8 @@ python deep_job_search.py \
   $COMPANY_LIST \
   $WEB_VERIFY \
   $DEBUG \
+  \
+  $DRY_RUN \
   --output $OUTPUT
 
 # Check exit code
@@ -79,8 +95,8 @@ STATUS=$?
 if [ $STATUS -eq 0 ]; then
   echo "Job search completed successfully!"
 
-  # Count the jobs found
-  if [ -f "$OUTPUT" ]; then
+  # Count the jobs found - skip for dry run
+  if [ -z "$DRY_RUN" ] && [ -f "$OUTPUT" ]; then
     JOB_COUNT=$(wc -l < "$OUTPUT")
     if [ $JOB_COUNT -gt 1 ]; then
       # Subtract header row
@@ -90,6 +106,8 @@ if [ $STATUS -eq 0 ]; then
     else
       echo "No jobs found."
     fi
+  elif [ -n "$DRY_RUN" ]; then
+    echo "Dry run completed successfully."
   else
     echo "Output file not created."
   fi
