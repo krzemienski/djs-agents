@@ -29,7 +29,9 @@ show_help() {
     echo "  --startups N   Number of startup jobs to find (default: 10)"
     echo "  --sample       Run with minimal settings (2 major, 2 startup jobs)"
     echo "  --quick        Alias for --sample"
-          # --use-responses option removed as we now only use Responses API
+    echo "  --rebuild      Force rebuild of the Docker image"
+    echo "  --model NAME   Model to use (default: gpt-4o)"
+    echo "  --company-list-limit N  Maximum companies to list in prompts (default: 10)"
     echo "  Other options are passed through to the container"
     echo ""
     exit 0
@@ -40,7 +42,6 @@ SHOW_HELP=false
 DOCKER_ARGS=""
 REBUILD=false
 SAMPLE=false
-# USE_RESPONSES variable is no longer needed
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -58,7 +59,6 @@ while [[ $# -gt 0 ]]; do
             DOCKER_ARGS="$DOCKER_ARGS --sample --majors 2 --startups 2 --log-level DEBUG"
             shift
             ;;
-        # --use-responses option removed as we now only use Responses API
         *)
             # Pass through all other arguments
             DOCKER_ARGS="$DOCKER_ARGS $1"
@@ -93,7 +93,13 @@ docker run --rm \
     -v $PWD/results:/app/results \
     --entrypoint=/bin/sh \
     jobbot \
-    -c "$ENTRYPOINT $DOCKER_ARGS"
+    -c "$ENTRYPOINT $DOCKER_ARGS; exit \$?"
 
-echo "🔹 Job search completed"
+# Capture the exit code from the container
+EXIT_CODE=$?
+
+echo "🔹 Job search completed with exit code: $EXIT_CODE"
 echo "🔹 Results saved in the results directory"
+
+# Propagate the exit code to the caller
+exit $EXIT_CODE
