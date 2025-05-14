@@ -93,7 +93,13 @@ docker run --rm \
     -v $PWD/results:/app/results \
     --entrypoint=/bin/sh \
     jobbot \
-    -c "$ENTRYPOINT $DOCKER_ARGS"
+    -c "$ENTRYPOINT $DOCKER_ARGS; exit \$?"
 
-echo "🔹 Job search completed"
+# Capture the exit code from the container
+EXIT_CODE=$?
+
+echo "🔹 Job search completed with exit code: $EXIT_CODE"
 echo "🔹 Results saved in the results directory"
+
+# Propagate the exit code to the caller
+exit $EXIT_CODE
