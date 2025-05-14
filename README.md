@@ -88,6 +88,7 @@ Main options:
   --log-file FILE       Log to this file in addition to console
   --force               Skip cost confirmation prompt
   --budget BUDGET       Maximum cost in USD (exit if exceeded)
+  --company-list-limit  Maximum number of companies to display in prompts
   --use-web-verify      Use web search for URL verification (limited implementation)
   --rebuild             Force rebuild of the Docker image
   --visualize           Generate visualization diagrams (default: True)
@@ -236,6 +237,9 @@ OPENAI_API_KEY=your_api_key_here
 
 # Custom job counts
 ./build-and-run.sh --majors 20 --startups 10
+
+# Limit company list length in prompts
+./build-and-run.sh --company-list-limit 5
 ```
 
 ### Model Selection
