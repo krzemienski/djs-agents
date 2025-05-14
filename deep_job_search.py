@@ -495,13 +495,13 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
     rate = TokenMonitor.COST_PER_1K.get(model, 0.005)  # Default to gpt-4o rate
     cost_estimate = (tokens_estimate / 1000) * rate
 
-    logger.info(f"Estimated resource usage:")
+    logger.info("Estimated resource usage:")
     logger.info(f"  - Tokens: ~{tokens_estimate:,} tokens")
     logger.info(f"  - Cost: ~${cost_estimate:.4f}")
 
     if cost_estimate > 0.50:  # Arbitrary threshold for a "high" cost
         logger.warning(f"⚠️ COST WARNING: Estimated cost (${cost_estimate:.4f}) exceeds $0.50")
-        logger.warning(f"Consider reducing job counts or using less expensive models")
+        logger.warning("Consider reducing job counts or using less expensive models")
 
         # Give user a chance to abort if cost is high
         if not cfg.get('force', False) and not os.environ.get('JOBBOT_SKIP_CONFIRM', ''):
@@ -517,7 +517,7 @@ def search_with_responses(cfg, logger) -> List[Dict[str, str]]:
 
     # Check for estimate-only mode
     if os.environ.get('JOBBOT_ESTIMATE_ONLY', ''):
-        logger.info(f"Estimate-only mode enabled. Exiting now.")
+        logger.info("Estimate-only mode enabled. Exiting now.")
         return []
 
     # Search for jobs
@@ -716,17 +716,14 @@ def main():
 
     # Check for estimate-only mode
     if os.environ.get('JOBBOT_ESTIMATE_ONLY', ''):
-        logger.info(f"Estimate-only mode enabled. Exiting now.")
+        logger.info("Estimate-only mode enabled. Exiting now.")
         return 0
 
     # Log execution start
     logger.info("Job search execution started")
 
     # Run the job search
-    rows = search_with_responses(cfg, logger)
-
-    # Save results
-    if rows:
+    if rows := search_with_responses(cfg, logger):
         save(rows, logger)
 
     return 0
