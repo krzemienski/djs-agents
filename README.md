@@ -565,20 +565,7 @@ JOBBOT_SKIP_CONFIRM=1 ./build-and-run.sh --model gpt-4.1 --majors 30 --startups 
 
 ```bash
 # Example with every single CLI option specified
-./build-and-run.sh \
-  --model gpt-4.1 \
-  --majors 25 \
-  --startups 25 \
-  --max-tokens 200000 \
-  --budget 25.00 \
-  --force \
-  --log-level DEBUG \
-  --log-file comprehensive_job_search.log \
-  --trace \
-  --company-list-limit 20 \
-  --visualize \
-  --rebuild \
-  --use-web-verify
+./build-and-run.sh --model gpt-4.1 --majors 25 --startups 25 --max-tokens 200000 --budget 25.00 --force --log-level DEBUG --log-file comprehensive_job_search.log --trace --company-list-limit 20 --visualize --rebuild --use-web-verify
 ```
 
 ### Logging and Debugging

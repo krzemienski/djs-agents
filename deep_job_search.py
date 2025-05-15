@@ -146,7 +146,7 @@ class JobListing(BaseModel):
 
 
 # ------------- logging -------------
-def setup_logger(level: str = "INFO", file: str | None = None) -> logging.Logger:
+def setup_logger(level: str = "INFO", file: str | None = None, trace: bool = False) -> logging.Logger:
     """Set up the enhanced logger with improved format and API logging capabilities."""
     # Create API log file path if a main log file is provided
     api_log_file = None
@@ -169,11 +169,27 @@ def setup_logger(level: str = "INFO", file: str | None = None) -> logging.Logger
     # Initialize the API wrapper with our logger
     initialize_api_wrapper(logger)
 
+    # Enable trace mode if requested
+    if trace:
+        _add_trace_handler(logger, logs_dir)
+
     # Log diagnostic info
     logger.debug(f"Logger initialized with level: {level}")
     logger.debug(f"Python version: {sys.version}")
 
     return logger
+
+def _add_trace_handler(logger: logging.Logger, logs_dir: Path) -> None:
+    """Add a trace handler to the logger for detailed debug output."""
+    # Add a trace handler to capture all logging at DEBUG level
+    trace_file = logs_dir / "debug" / "trace.log"
+    trace_file.parent.mkdir(exist_ok=True)
+    trace_handler = logging.FileHandler(trace_file)
+    trace_handler.setLevel(logging.DEBUG)
+    trace_formatter = logging.Formatter('%(asctime)s [TRACE] %(name)s.%(funcName)s:%(lineno)d - %(message)s')
+    trace_handler.setFormatter(trace_formatter)
+    logger.addHandler(trace_handler)
+    logger.info(f"Trace mode enabled, logging to {trace_file}")
 
 
 class Timer:
@@ -1094,6 +1110,10 @@ def parse_args():
     parser.add_argument("--model", type=str, default="gpt-4o", help="Model to use (gpt-4o, gpt-4, gpt-3.5-turbo)")
     parser.add_argument("--max-tokens", type=int, default=None, help="Max tokens for API calls")
 
+    # Budget and confirmation options
+    parser.add_argument("--budget", type=float, default=None, help="Maximum cost in USD (exit if exceeded)")
+    parser.add_argument("--force", action="store_true", help="Skip cost confirmation prompt")
+
     # Options
     parser.add_argument("--company-list", type=str, help="CSV file with custom companies")
     parser.add_argument("--company-list-limit", type=int, default=20, help="Limit of companies to use from list")
@@ -1102,12 +1122,20 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Enable debug mode with more logging")
     parser.add_argument("--save-raw", action="store_true", help="Save raw API responses")
     parser.add_argument("--use-cache", action="store_true", help="Use cached API responses if available")
+    parser.add_argument("--log-level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)")
+    parser.add_argument("--log-file", type=str, default="logs/debug/deep_job_search.log", help="Log file path")
+    parser.add_argument("--trace", action="store_true", help="Enable trace output for detailed execution tracking")
     parser.add_argument("--visualize", action="store_true", default=True, help="Enable agent visualization")
+    parser.add_argument("--no-visualize", action="store_true", help="Disable visualization generation")
 
     parser.add_argument("--output", type=str, default="results/jobs.csv", help="Output file path")
     parser.add_argument("--dry-run", action="store_true", help="Run without making API calls (for testing)")
 
     args = parser.parse_args()
+
+    # Handle --no-visualize flag
+    if args.no_visualize:
+        args.visualize = False
 
     # Set up configuration dictionary
     cfg = {
@@ -1123,9 +1151,12 @@ def parse_args():
         "use_cache": args.use_cache,
         "visualize": args.visualize,
         "output": args.output,
-        "log_level": "DEBUG" if args.debug else "INFO",
-        "log_file": "logs/debug/deep_job_search.log",
-        "dry_run": args.dry_run
+        "log_level": args.log_level or ("DEBUG" if args.debug else "INFO"),
+        "log_file": args.log_file,
+        "dry_run": args.dry_run,
+        "trace": args.trace,
+        "budget": args.budget,
+        "force": args.force
     }
 
     if args.max_tokens:
@@ -1153,6 +1184,10 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=None, help="Max tokens for API calls")
     parser.add_argument("--dry-run", action="store_true", help="Run without making API calls (for testing)")
 
+    # Budget and confirmation options
+    parser.add_argument("--budget", type=float, default=None, help="Maximum cost in USD (exit if exceeded)")
+    parser.add_argument("--force", action="store_true", help="Skip cost confirmation prompt")
+
     # Validation options
     parser.add_argument("--validate-urls", action="store_true", default=True, help="Enable URL validation")
     parser.add_argument("--web-verify", action="store_true", default=False, help="Use web search to verify job URLs")
@@ -1166,9 +1201,17 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Enable debug mode with more logging")
     parser.add_argument("--save-raw", action="store_true", help="Save raw API responses")
     parser.add_argument("--use-cache", action="store_true", help="Use cached API responses if available")
+    parser.add_argument("--log-level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)")
     parser.add_argument("--log-file", type=str, default="logs/debug/deep_job_search.log", help="Log file path")
+    parser.add_argument("--trace", action="store_true", help="Enable trace output for detailed execution tracking")
+    parser.add_argument("--visualize", action="store_true", default=True, help="Enable agent visualization")
+    parser.add_argument("--no-visualize", action="store_true", help="Disable visualization generation")
 
     args = parser.parse_args()
+
+    # Handle --no-visualize flag
+    if args.no_visualize:
+        args.visualize = False
 
     # Setup configuration
     config = {
@@ -1181,9 +1224,13 @@ def main():
         "save_raw_responses": args.save_raw,
         "use_cache": args.use_cache,
         "debug": args.debug,
-        "log_level": "DEBUG" if args.debug else "INFO",
+        "log_level": args.log_level or ("DEBUG" if args.debug else "INFO"),
         "log_file": args.log_file,
-        "dry_run": args.dry_run
+        "dry_run": args.dry_run,
+        "visualize": args.visualize,
+        "trace": args.trace,
+        "budget": args.budget,
+        "force": args.force
     }
 
     if args.max_tokens:
@@ -1194,7 +1241,7 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Set up logging
-    logger = setup_logger(level=config["log_level"], file=config["log_file"])
+    logger = setup_logger(level=config["log_level"], file=config["log_file"], trace=config["trace"])
     logger.info("Starting Deep Job Search")
 
     # Check for dry run mode
@@ -1205,6 +1252,19 @@ def main():
         print("✓ Logging configured")
         print("✓ Directories exist")
         return 0
+
+    # Budget confirmation check
+    if config["budget"] is not None and not config["force"]:
+        logger.info(f"Budget set to ${config['budget']:.2f}")
+        if "JOBBOT_SKIP_CONFIRM" not in os.environ:
+            print(f"\nBudget set to ${config['budget']:.2f}.")
+            confirm = input("Continue? [y/N] ")
+            if confirm.lower() != 'y':
+                logger.info("User cancelled job search due to budget concerns")
+                print("Job search cancelled.")
+                return 0
+        else:
+            logger.info("Budget confirmation skipped due to JOBBOT_SKIP_CONFIRM environment variable")
 
     # Log configuration
     logger.info(f"Configuration:")
@@ -1257,6 +1317,11 @@ def main():
                 )
                 print(f"\nToken usage: {total_tokens:,}")
                 print(f"Estimated cost: ${total_cost:.4f}")
+
+                # Check budget if set
+                if config["budget"] is not None and total_cost > config["budget"]:
+                    logger.warning(f"Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                    print(f"\nWARNING: Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
             except Exception as e:
                 logger.warning(f"Could not generate token usage report: {e}")
 
