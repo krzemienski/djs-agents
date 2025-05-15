@@ -22,6 +22,8 @@ LOG_FILE=""
 DRY_RUN=""
 VISUALIZE="--visualize" # Enable visualization by default
 TRACE=""
+BUDGET=""
+FORCE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -94,21 +96,20 @@ while [[ $# -gt 0 ]]; do
       TRACE="--trace"
       shift
       ;;
-    --budget|--force)
-      # These arguments aren't supported by deep_job_search.py but are mentioned in README
-      # Just skip them for now
+    --budget)
+      BUDGET="--budget $2"
+      shift 2
+      ;;
+    --force)
+      FORCE="--force"
       shift
-      if [[ "$1" != --* && "$1" != -* && "$1" != "" ]]; then
-        # If the next argument isn't a flag, it's the value for this parameter
-        shift
-      fi
       ;;
     *)
       echo "Unknown option: $1"
       echo "Usage: $0 [-m|--majors COUNT] [-s|--startups COUNT] [--model MODEL] [--max-tokens COUNT]"
       echo "         [--company-list FILE] [--company-list-limit COUNT] [--web-verify|--no-web-verify]"
       echo "         [--debug] [--log-level LEVEL] [--log-file FILE] [--output FILE] [--dry-run]"
-      echo "         [--visualize|--no-visualize] [--trace]"
+      echo "         [--visualize|--no-visualize] [--trace] [--budget AMOUNT] [--force]"
       exit 1
       ;;
   esac
@@ -124,6 +125,12 @@ echo "- Output: $OUTPUT"
 echo "- Mode: Full multi-agent"
 if [ -n "$DRY_RUN" ]; then
   echo "- Dry run: Yes (no API calls will be made)"
+fi
+if [ -n "$BUDGET" ]; then
+  echo "- Budget: $(echo $BUDGET | cut -d' ' -f2)"
+fi
+if [ -n "$FORCE" ]; then
+  echo "- Force mode: Enabled (skipping confirmations)"
 fi
 echo "========================="
 
@@ -142,6 +149,8 @@ python deep_job_search.py \
   $DRY_RUN \
   $VISUALIZE \
   $TRACE \
+  $BUDGET \
+  $FORCE \
   --output $OUTPUT
 
 # Check exit code
