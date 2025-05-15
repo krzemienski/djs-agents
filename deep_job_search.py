@@ -171,21 +171,25 @@ def setup_logger(level: str = "INFO", file: str | None = None, trace: bool = Fal
 
     # Enable trace mode if requested
     if trace:
-        # Add a trace handler to capture all logging at DEBUG level
-        trace_file = logs_dir / "debug" / "trace.log"
-        trace_file.parent.mkdir(exist_ok=True)
-        trace_handler = logging.FileHandler(trace_file)
-        trace_handler.setLevel(logging.DEBUG)
-        trace_formatter = logging.Formatter('%(asctime)s [TRACE] %(name)s.%(funcName)s:%(lineno)d - %(message)s')
-        trace_handler.setFormatter(trace_formatter)
-        logger.addHandler(trace_handler)
-        logger.info(f"Trace mode enabled, logging to {trace_file}")
+        _add_trace_handler(logger, logs_dir)
 
     # Log diagnostic info
     logger.debug(f"Logger initialized with level: {level}")
     logger.debug(f"Python version: {sys.version}")
 
     return logger
+
+def _add_trace_handler(logger: logging.Logger, logs_dir: Path) -> None:
+    """Add a trace handler to the logger for detailed debug output."""
+    # Add a trace handler to capture all logging at DEBUG level
+    trace_file = logs_dir / "debug" / "trace.log"
+    trace_file.parent.mkdir(exist_ok=True)
+    trace_handler = logging.FileHandler(trace_file)
+    trace_handler.setLevel(logging.DEBUG)
+    trace_formatter = logging.Formatter('%(asctime)s [TRACE] %(name)s.%(funcName)s:%(lineno)d - %(message)s')
+    trace_handler.setFormatter(trace_formatter)
+    logger.addHandler(trace_handler)
+    logger.info(f"Trace mode enabled, logging to {trace_file}")
 
 
 class Timer:
