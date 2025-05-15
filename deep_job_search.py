@@ -261,61 +261,65 @@ async def validate_job_url(url: str) -> bool:
         # Check for suspicious patterns
         suspicious_patterns = [
             "example.com", "test", "dummy", "placeholder",
-            "example", "localhost", "127.0.0.1", "test.com",
-            "{company}", "{role}", "{id}", "{keyword}"
+            "127.0.0.1", "localhost", "template", "demo"
+        ]
+        if any(pattern in url.lower() for pattern in suspicious_patterns):
+            logging.info(f"✖ Suspicious URL pattern detected: {url}")
+            return False
+
+        # Block known troublesome job listing URLs
+        blocked_patterns = [
+            # Major company job boards that often 404 or have false positives
+            "google.com/about/careers/applications/jobs/results/",
+            "jobs.apple.com/en-us/details/",
+            "amazon.jobs/en/jobs/",
+            "careers.microsoft.com/us/en/job/",
+            "netflix.com/jobs/jobs/",
+            "meta.com/careers/jobs/",
+
+            # Common patterns in URLs that point to expired listings
+            "expired", "closed", "filled", "not-found", "404",
+            "removed", "archived", "old-job", "past-jobs"
         ]
 
-        # Skip example URLs and suspicious patterns
-        url_lower = url.lower()
+        if any(pattern in url.lower() for pattern in blocked_patterns):
+            logging.info(f"✖ Known problematic job URL pattern detected: {url}")
+            return False
 
-        # Reject obviously fake/example URLs
-        for pattern in suspicious_patterns:
-            if pattern in url_lower:
-                logging.info(f"✖ Suspicious URL pattern detected '{pattern}' in: {url}")
+        # Allowlist common job boards that tend to be more reliable
+        allowlisted_domains = [
+            "lever.co", "greenhouse.io", "jobs.ashbyhq.com",
+            "workable.com", "jobvite.com", "boards.greenhouse.io",
+            "job-boards.greenhouse.io", "wellfound.com", "angel.co",
+            "ycombinator.com", "techstars.com"
+        ]
+
+        # If not in allowlist, check if domain looks job-related
+        if not any(domain in parsed_url.netloc.lower() for domain in allowlisted_domains):
+            # Check if the domain or path at least contains job-related terms
+            job_terms = [
+                "job", "career", "work", "employ", "position", "hire",
+                "apply", "applications", "opening", "vacancy"
+            ]
+
+            domain_path = f"{parsed_url.netloc}{parsed_url.path}".lower()
+            if not any(term in domain_path for term in job_terms):
+                logging.info(f"✖ URL doesn't appear to be job-related: {url}")
                 return False
 
-        # Also reject URLs with no valid domain
-        if not any(tld in url_lower for tld in [".com", ".org", ".io", ".net", ".gov", ".edu", ".co", ".jobs"]):
-            logging.info(f"✖ No valid TLD found in URL: {url}")
+        # First try using a browser to verify
+        browser_result = await verify_with_browser(url)
+        if browser_result:
+            return True
+        else:
+            # Browser verification failed,
+            # be strict and reject rather than assume it's valid
+            logging.info(f"✖ URL failed browser verification: {url}")
             return False
-
-        # Check for search result URLs that don't point to individual job postings
-        search_result_indicators = [
-            "q=", "query=", "search=", "results", "/search",
-            "jobs.html", "/jobs?", "/jobs/", "careers?",
-            "job-search", "?keywords=", "?location="
-        ]
-
-        # If URL has search parameters but not specific job identifiers, it's likely a search results page
-        has_search_params = any(indicator in url_lower for indicator in search_result_indicators)
-        has_job_id = re.search(r'(job|position|posting|listing|career)/?\d', url_lower) is not None
-
-        if has_search_params and not has_job_id:
-            logging.info(f"✖ Likely a search results page, not a specific job posting: {url}")
-            return False
-
-        # First, do basic URL pattern validation
-        job_domains = [
-            "linkedin.com/jobs", "indeed.com/job", "glassdoor.com/job",
-            "lever.co", "greenhouse.io", "workday.com", "smartrecruiters.com",
-            "jobs.", "careers.", "apply.", "/job/", "/jobs/"
-        ]
-
-        domain_valid = any(pattern in url_lower for pattern in job_domains)
-
-        if not domain_valid:
-            logging.info(f"✖ No job board patterns found: {url}")
-            return False
-
-        # Basic validation passed, now try MCP Browser validation if available
-        logging.info(f"🔍 Validating job URL: {url}")
-
-        # We need to handle this differently than trying to import modules
-        # Since we're using function tools, we'll do a direct call with a function
-        return await verify_with_browser(url)
 
     except Exception as e:
-        logging.error(f"✖ URL validation error: {str(e)}")
+        logging.error(f"Error validating job URL: {e}")
+        logging.error(traceback.format_exc())
         return False
 
 async def verify_with_browser(url: str) -> bool:
@@ -339,452 +343,211 @@ async def verify_with_browser(url: str) -> bool:
             import mcp_puppeteer_puppeteer_evaluate
             import mcp_puppeteer_puppeteer_screenshot
             browser_available = True
-        except ImportError:
-            logging.info(f"✓ Apply button found (browser not available): {url}")
+        except ImportError as e:
+            logging.warning(f"Browser verification tools not available: {e}")
+
+            # More strict pattern matching fallback
+            suspicious_domains = [
+                "example.com", "test.com", "demo", "localhost", "127.0.0.1",
+                "staging", "dev.", "development", ".local"
+            ]
+            if any(domain in url.lower() for domain in suspicious_domains):
+                logging.info(f"✖ Suspicious URL domain detected in fallback check: {url}")
+                return False
+
+            # Special checks for common job boards that we know have issues
+
+            # Google Career URLs - These frequently 404
+            if "google.com/about/careers/applications/jobs/results/" in url.lower():
+                logging.info(f"✖ Google Careers URL rejected (commonly 404): {url}")
+                return False
+
+            # Apple job URLs - These frequently 404
+            if "jobs.apple.com/en-us/details/" in url.lower():
+                logging.info(f"✖ Apple Jobs URL rejected (commonly 404): {url}")
+                return False
+
+            # Amazon Jobs - These frequently 404
+            if "amazon.jobs/en/jobs/" in url.lower():
+                logging.info(f"✖ Amazon Jobs URL rejected (commonly 404): {url}")
+                return False
+
+            # Other major job boards with ID-based URLs that may be inactive
+            # Instead, focus on job boards with more reliable URLs
+
+            # If we have to fall back, be more restrictive about what URLs we accept
+            # Pattern matching for common job boards to reduce false positives
+            trusted_domains = [
+                "lever.co", "greenhouse.io", "jobs.ashbyhq.com",
+                "workable.com", "jobvite.com", "linkedin.com/jobs",
+                "wellfound.com", "angel.co/jobs", "indeed.com",
+                "glassdoor.com", "remotejobs", "wellfound.com",
+                "ycombinator.com", "y-combinator", "techstars.com",
+                "stackoverflow.com/jobs", "remoteok.io",
+                "boards.greenhouse.io", "job-boards.greenhouse.io"
+            ]
+
+            if not any(domain in url.lower() for domain in trusted_domains):
+                # For non-job board domains, be more cautious
+                job_path_patterns = [
+                    "job", "career", "position", "vacancy", "employment", "hiring",
+                    "job-application", "job-posting", "job-details", "job-description"
+                ]
+                if not any(pattern in url.lower() for pattern in job_path_patterns):
+                    logging.info(f"✖ URL doesn't contain job path patterns in fallback check: {url}")
+                    return False
+
+            logging.warning(f"Falling back to pattern matching for URL: {url}")
             return True
 
-        if browser_available:
-            try:
-                # Store the original URL for comparison to detect redirects
-                original_url = url.lower()
+        if not browser_available:
+            logging.warning("Browser verification failed - no browser tools available")
+            return False
 
-                # Navigate to the URL
-                await mcp_puppeteer_puppeteer_navigate.mcp_puppeteer_puppeteer_navigate({"url": url})
+        # Navigate to the job URL
+        navigate_result = await mcp_puppeteer_puppeteer_navigate.async_api({"url": url})
+        logging.debug(f"Navigate result: {navigate_result}")
 
-                # Wait a moment for any JavaScript redirects to complete
-                await asyncio.sleep(1)
+        # Get the final URL after any redirects
+        current_url_script = "window.location.href"
+        current_url_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": current_url_script})
+        final_url = current_url_result.get("result", url)
 
-                # Take a screenshot for verification
-                screenshot_name = f"job_verify_{url.replace('://', '_').replace('.', '_').replace('/', '_')[:30]}"
-                try:
-                    # Save to logs/visuals directory for better organization
-                    screenshot_dir = Path("logs/visuals")
-                    screenshot_dir.mkdir(exist_ok=True, parents=True)
-
-                    # Add .png extension and timestamp to avoid overwrites
-                    screenshot_name = f"{screenshot_name}_{int(time.time())}.png"
-
-                    # Take the screenshot
-                    await mcp_puppeteer_puppeteer_screenshot.mcp_puppeteer_puppeteer_screenshot({
-                        "name": screenshot_name,
-                        "width": 1200,
-                        "height": 900
-                    })
-
-                    logging.info(f"Screenshot saved as {screenshot_name}")
-                except Exception as e:
-                    logging.warning(f"Screenshot failed: {e}")
-
-                # First, check if we were redirected to a different URL
-                redirect_script = """
-                () => {
-                    return {
-                        currentUrl: window.location.href.toLowerCase(),
-                        originalPath: document.referrer
-                    };
-                }
-                """
-
-                redirect_result = await mcp_puppeteer_puppeteer_evaluate.mcp_puppeteer_puppeteer_evaluate({"script": redirect_script})
-                current_url = redirect_result.get('currentUrl', '').lower()
-
-                # Detect redirect to a different page (with special handling for career pages)
-                redirected = False
-                if current_url and original_url.replace('http://', '').replace('https://', '') != current_url.replace('http://', '').replace('https://', ''):
-                    # Check if we've been redirected to a general careers page
-                    if (
-                        ('jobs' in original_url and 'jobs' not in current_url) or
-                        ('careers' in original_url and 'careers' in current_url and 'position' not in current_url) or
-                        ('apply' in original_url and 'apply' not in current_url) or
-                        ('job' in original_url and 'job' not in current_url) or
-                        (('/jobs/' in original_url or '/job/' in original_url) and ('/jobs/' not in current_url and '/job/' not in current_url))
-                    ):
-                        logging.info(f"✖ Redirected from job-specific URL to general page: {original_url} → {current_url}")
-                        redirected = True
-
-                # If we detected a problematic redirect, return false
-                if redirected:
-                    return False
-
-                # Check for HTTP status codes and page load status
-                http_status_script = """
-                () => {
-                    const performanceEntries = performance.getEntriesByType('navigation');
-                    let status = 200;  // Default status
-
-                    if (performanceEntries && performanceEntries.length > 0) {
-                        // Modern browsers support this
-                        if (performanceEntries[0].responseStatus) {
-                            status = performanceEntries[0].responseStatus;
-                        }
-                    }
-
-                    return {
-                        status: status,
-                        url: window.location.href,
-                        title: document.title,
-                        bodyText: document.body ? document.body.innerText.substring(0, 100) : ''
-                    };
-                }
-                """
-
-                status_result = await mcp_puppeteer_puppeteer_evaluate.mcp_puppeteer_puppeteer_evaluate({"script": http_status_script})
-                status_code = status_result.get('status', 200)
-
-                # Check if we got a non-200 status code
-                if status_code >= 400:
-                    logging.info(f"✖ HTTP error status {status_code} for URL: {url}")
-                    return False
-
-                # Advanced page analysis to detect error pages and job not found content
-                deep_analysis_script = """
-                () => {
-                    // Get page meta information
-                    const pageTitle = document.title.toLowerCase();
-                    const pageContent = document.body.innerText.toLowerCase();
-                    const currentUrl = window.location.href.toLowerCase();
-                    const h1Text = Array.from(document.querySelectorAll('h1')).map(h => h.innerText.toLowerCase()).join(' ');
-                    const h2Text = Array.from(document.querySelectorAll('h2')).map(h => h.innerText.toLowerCase()).join(' ');
-                    const metaDescription = document.querySelector('meta[name="description"]')?.content.toLowerCase() || '';
-
-                    // Extremely comprehensive list of error patterns
-                    const errorPatterns = [
-                        'job not found',
-                        'page not found',
-                        'position has been filled',
-                        'no longer available',
-                        'position closed',
-                        'no results found',
-                        'not accepting applications',
-                        'job is no longer open',
-                        'this position has been filled',
-                        'job opening not found',
-                        'not exist',
-                        'cannot be found',
-                        'does not exist',
-                        'position is closed',
-                        'role does not exist',
-                        'job may have been taken down',
-                        'has been moved',
-                        'doesn\'t exist',
-                        'the page you were looking for',
-                        'this job is no longer active',
-                        '404',
-                        'page not accessible',
-                        'no job found',
-                        'job has been closed',
-                        'job has expired',
-                        'sorry, this',
-                        'mistyped the address',
-                        'not available',
-                        'job not available',
-                        'can\'t be found',
-                        'cannot be found',
-                        'no longer exists',
-                        'we apologize',
-                        'oops',
-                        'hmm',
-                        'remove',
-                        'redirect',
-                        'incorrect url',
-                        'not a valid',
-                        'invalid',
-                        'expired',
-                        'we\'re sorry',
-                        'we are sorry'
-                    ];
-
-                    // Check for error patterns in headings - these are high-confidence signals
-                    const headingHasError = errorPatterns.some(pattern =>
-                        h1Text.includes(pattern) || h2Text.includes(pattern)
-                    );
-
-                    // Check for specific patterns that indicate a page not found error in heading text
-                    const pageNotFoundHeading = (
-                        h1Text.includes('page not found') ||
-                        h1Text.includes('not found') ||
-                        h1Text.includes('doesn\'t exist') ||
-                        h1Text.includes('does not exist') ||
-                        h1Text.includes('no longer available') ||
-                        h1Text.includes('the page you were looking for')
-                    );
-
-                    // Check for HTTP status code indicators
-                    let hasErrorCode = false;
-                    if (document.querySelector('.error-code, .not-found-code, .page-error, .error-404, .not-found, .error-page, .error-container, .error-message, .error-text')) {
-                        hasErrorCode = true;
-                    }
-
-                    // Check for common error page elements
-                    let hasErrorPage = false;
-                    if (document.querySelector('.error-page, .not-found, .page-404, .missing-page, [data-testid="error"], [data-error="true"], .error-container, .error-state, .error-message, .error-view')) {
-                        hasErrorPage = true;
-                    }
-
-                    // Check for visual error indicators (large icons, etc.)
-                    let hasErrorVisuals = false;
-                    const errorImages = document.querySelectorAll('img[src*="error"], img[src*="404"], img[alt*="error"], img[alt*="not found"]');
-                    if (errorImages.length > 0) {
-                        hasErrorVisuals = true;
-                    }
-
-                    // Check for URL redirects to error pages
-                    let hasErrorRedirect = false;
-                    if (currentUrl.includes('error') || currentUrl.includes('not-found') || currentUrl.includes('404')) {
-                        hasErrorRedirect = true;
-                    }
-
-                    // Check for common text patterns that indicate job was already taken down
-                    const hasTakenDownText = pageContent.includes('taken down') ||
-                                            pageContent.includes('removed') ||
-                                            pageContent.includes('no longer available') ||
-                                            pageContent.includes('has been closed');
-
-                    // Check for error patterns in title
-                    const titleHasError = errorPatterns.some(pattern => pageTitle.includes(pattern));
-
-                    // Check for error patterns in content
-                    const contentHasError = errorPatterns.some(pattern => pageContent.includes(pattern));
-
-                    // In-depth content analysis for job page components
-                    // Check if there's actually job description content
-                    let hasJobContent = false;
-
-                    // Common terms found on real job pages
-                    const jobTerms = [
-                        'requirements',
-                        'qualifications',
-                        'responsibilities',
-                        'what you'll do',
-                        'about the role',
-                        'job description',
-                        'required skills',
-                        'preferred qualifications',
-                        'desired skills',
-                        'key responsibilities',
-                        'our ideal candidate',
-                        'day-to-day',
-                        'about this role',
-                        'skills and experience',
-                        'required experience',
-                        'the role'
-                    ];
-
-                    // Check if any job terms exist
-                    hasJobContent = jobTerms.some(term => pageContent.includes(term));
-
-                    // Look for common job page sections
-                    if (document.querySelector('#job-details, .job-description, [data-automation="job-details"], .description, [data-test="job-info"], .job-content, [data-job-description]')) {
-                        hasJobContent = true;
-                    }
-
-                    // Additional check: Try to find any common apply button text (just for verification)
-                    const applyText = ['apply', 'apply now', 'apply for this job', 'submit application', 'apply for position'].some(text =>
-                        pageContent.includes(text)
-                    );
-
-                    // Check if the URL is for a job search/listings page rather than a specific job
-                    const isSearchPage = (
-                        (pageTitle.includes('search') && pageTitle.includes('job')) ||
-                        (pageTitle.includes('careers') && !pageTitle.includes('detail')) ||
-                        (pageTitle.includes('job') && pageTitle.includes('listing')) ||
-                        pageContent.includes('search for jobs') ||
-                        document.querySelector('.job-search, .search-results, .job-listings, .job-list, [data-test="search-results"]')
-                    );
-
-                    // Check word count - most job descriptions have substantial content
-                    const wordCount = pageContent.split(/\s+/).length;
-                    const hasSubstantialContent = wordCount > 200;  // Most job descriptions are longer than 200 words
-
-                    // Check for security errors or access restriction messages
-                    const hasSecurityRestriction =
-                        pageContent.includes('access denied') ||
-                        pageContent.includes('not authorized') ||
-                        pageContent.includes('permission denied') ||
-                        pageContent.includes('sign in to view') ||
-                        pageContent.includes('login to view');
-
-                    // Check if the page looks like a job description (comprehensive)
-                    const looksLikeJobDescription = (
-                        hasJobContent &&
-                        hasSubstantialContent &&
-                        !isSearchPage &&
-                        !hasErrorPage &&
-                        !hasErrorVisuals &&
-                        !titleHasError &&
-                        !headingHasError &&
-                        !hasSecurityRestriction
-                    );
-
-                    return {
-                        title: pageTitle,
-                        headingHasError: headingHasError,
-                        pageNotFoundHeading: pageNotFoundHeading,
-                        hasErrorCode: hasErrorCode,
-                        hasErrorPage: hasErrorPage,
-                        hasErrorVisuals: hasErrorVisuals,
-                        hasErrorRedirect: hasErrorRedirect,
-                        titleHasError: titleHasError,
-                        contentHasError: contentHasError,
-                        hasTakenDownText: hasTakenDownText,
-                        hasJobContent: hasJobContent,
-                        applyText: applyText,
-                        isSearchPage: isSearchPage,
-                        wordCount: wordCount,
-                        hasSubstantialContent: hasSubstantialContent,
-                        hasSecurityRestriction: hasSecurityRestriction,
-                        looksLikeJobDescription: looksLikeJobDescription,
-                        h1Text: h1Text,
-                        contentSnippet: pageContent.substring(0, 300) // Include a snippet for logging
-                    };
-                }
-                """
-
-                analysis_result = await mcp_puppeteer_puppeteer_evaluate.mcp_puppeteer_puppeteer_evaluate({"script": deep_analysis_script})
-
-                # Extract the content snippet for better debugging
-                content_snippet = analysis_result.get('contentSnippet', '')[:100] + '...'
-
-                # Log details about what was found
-                logging.debug(f"URL check details - Title: {analysis_result.get('title', 'Unknown')}")
-                logging.debug(f"H1 text: {analysis_result.get('h1Text', 'None')}")
-                logging.debug(f"Content sample: {content_snippet}")
-                logging.debug(f"Word count: {analysis_result.get('wordCount', 0)}")
-
-                # Check for error indicators in headings first (most reliable)
-                if analysis_result.get('headingHasError', False) or analysis_result.get('pageNotFoundHeading', False):
-                    logging.info(f"✖ Error detected in page headings: {url} - {analysis_result.get('h1Text', '')}")
-                    return False
-
-                # If we've landed on a search page rather than a specific job posting, that's a problem
-                if analysis_result.get('isSearchPage', False):
-                    logging.info(f"✖ URL points to a job search page, not a specific job: {url}")
-                    return False
-
-                # Check for error indicators, with detailed logging
-                error_detected = (
-                    analysis_result.get('hasErrorCode', False) or
-                    analysis_result.get('hasErrorPage', False) or
-                    analysis_result.get('hasErrorVisuals', False) or
-                    analysis_result.get('hasErrorRedirect', False) or
-                    analysis_result.get('titleHasError', False) or
-                    analysis_result.get('contentHasError', False) or
-                    analysis_result.get('hasTakenDownText', False) or
-                    not analysis_result.get('hasSubstantialContent', True) or  # Missing substantial content
-                    analysis_result.get('hasSecurityRestriction', False)
-                )
-
-                # If job content not found, that's another signal this might be an error page
-                job_content_missing = not analysis_result.get('hasJobContent', False)
-
-                # If the page doesn't look like a job description overall, that's a high-confidence signal
-                not_a_job_description = not analysis_result.get('looksLikeJobDescription', False)
-
-                if error_detected:
-                    reasons = []
-                    if analysis_result.get('hasErrorCode'): reasons.append("error code detected")
-                    if analysis_result.get('hasErrorPage'): reasons.append("error page elements found")
-                    if analysis_result.get('hasErrorVisuals'): reasons.append("error visuals found")
-                    if analysis_result.get('hasErrorRedirect'): reasons.append("URL indicates error page")
-                    if analysis_result.get('titleHasError'): reasons.append("error in page title")
-                    if analysis_result.get('contentHasError'): reasons.append("error in page content")
-                    if analysis_result.get('hasTakenDownText'): reasons.append("job taken down message")
-                    if not analysis_result.get('hasSubstantialContent', True): reasons.append("page lacks substantive content")
-                    if analysis_result.get('hasSecurityRestriction'): reasons.append("page has access restrictions")
-
-                    logging.info(f"✖ Job not found or error page detected: {url} - {analysis_result.get('title', '')}")
-                    logging.info(f"  Reasons: {', '.join(reasons)}")
-                    return False
-
-                # Additional check - if no error detected but also no job content found, this might be a false positive
-                if job_content_missing and not analysis_result.get('applyText', False):
-                    logging.info(f"✖ No job content found: {url} - {analysis_result.get('title', '')}")
-                    return False
-
-                # If page doesn't look like a job description overall
-                if not_a_job_description:
-                    logging.info(f"✖ Page doesn't resemble a job description: {url}")
-                    return False
-
-                # If no errors found, check for Apply button or text
-                script = """
-                () => {
-                    // Look for common apply button text
-                    const textPatterns = ['apply', 'submit', 'send application', 'apply now', 'apply for this job'];
-
-                    // Look for common apply button elements
-                    const buttonSelectors = [
-                        'button[type="submit"]',
-                        'input[type="submit"]',
-                        'a[href*="apply"]',
-                        'button:contains("Apply")',
-                        'a:contains("Apply")',
-                        '[aria-label*="apply" i]',
-                        '[id*="apply" i]',
-                        '[class*="apply" i]',
-                        // Additional apply button selectors
-                        '.apply-button',
-                        '.apply-now',
-                        '[data-automation="apply"]',
-                        '[data-test="apply-button"]',
-                        'a.job-apply',
-                        '.job-app-btn',
-                        '.application-btn',
-                        'a.btn-apply'
-                    ];
-
-                    // Check for text patterns in the page content
-                    const pageText = document.body.innerText.toLowerCase();
-                    const hasApplyText = textPatterns.some(pattern => pageText.includes(pattern));
-
-                    // Check for apply button elements
-                    let hasApplyButton = false;
-                    for (const selector of buttonSelectors) {
-                        try {
-                            const elements = document.querySelectorAll(selector);
-                            if (elements && elements.length > 0) {
-                                hasApplyButton = true;
-                                break;
-                            }
-                        } catch (e) {
-                            // Ignore invalid selectors
-                        }
-                    }
-
-                    return {
-                        hasApplyText: hasApplyText,
-                        hasApplyButton: hasApplyButton,
-                        title: document.title
-                    };
-                }
-                """
-
-                result = await mcp_puppeteer_puppeteer_evaluate.mcp_puppeteer_puppeteer_evaluate({"script": script})
-
-                if result.get('hasApplyButton') or result.get('hasApplyText'):
-                    # Additional confidence check - if we have apply button/text AND substantial content, it's likely a real job
-                    if analysis_result.get('hasSubstantialContent', False) and analysis_result.get('hasJobContent', False):
-                        logging.info(f"✓ Apply button found and page looks like a job listing: {url} - {result.get('title', '')}")
-                        return True
-                    elif analysis_result.get('hasJobContent', False):
-                        logging.info(f"✓ Apply button found with job content: {url}")
-                        return True
-                    else:
-                        logging.info(f"✓ Apply button found but limited job content: {url}")
-                        return True  # Still return true if apply button found
-                else:
-                    logging.info(f"✖ No Apply button found: {url}")
-                    return False
-            except Exception as e:
-                logging.warning(f"✖ Browser verification failed: {str(e)}")
-                # Since we already passed basic URL pattern validation, we should be more cautious here
-                # and not assume the URL is valid just because browser verification failed
-                logging.info(f"✖ Cannot verify job URL with browser: {url}")
+        if url != final_url:
+            logging.warning(f"URL redirected from {url} to {final_url}")
+            # Check if redirected to a homepage or generic listing
+            redirect_patterns = [
+                "/jobs", "/careers", "/work", "/home", "linkedin.com",
+                "indeed.com", "glassdoor.com", "404", "not-found", "error"
+            ]
+            if any(pattern in final_url.lower() for pattern in redirect_patterns):
+                logging.info(f"✖ Invalid redirect detected: {final_url}")
                 return False
+
+        # Check if page has job not found messages or error indicators
+        # First check for common error text patterns
+        page_text_script = """
+            document.body.innerText ||
+            (document.body.textContent ? document.body.textContent.trim() : '')
+        """
+        page_text_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": page_text_script})
+        page_text = page_text_result.get("result", "").lower()
+
+        # Common error message patterns across job sites
+        error_patterns = [
+            "job not found", "not found", "no longer available",
+            "position has been filled", "isn't available", "isn't active",
+            "job you're looking for isn't available", "taken down",
+            "has been closed", "has expired", "has been removed",
+            "not accepting applications", "is closed", "sorry",
+            "404", "page not found", "could not be found", "job deleted",
+            "we couldn't find that job", "this job may have been taken down",
+            "this job is no longer active", "something went wrong",
+            "job has been filled", "position is no longer open",
+            "does not exist", "jobs below", "check them out by searching",
+            "we couldn't find the page you were looking for",
+            "we can't find the page you're looking for",
+            "role does not exist", "no longer available", "this role does not exist",
+            "page not found", "search current openings"
+        ]
+
+        if any(pattern in page_text for pattern in error_patterns):
+            logging.info(f"✖ Job page indicates job not available: {url}")
+            # Take a screenshot for debugging
+            try:
+                await mcp_puppeteer_puppeteer_screenshot.async_api({"name": "job_not_found"})
+            except Exception as e:
+                logging.warning(f"Failed to take screenshot: {e}")
+            return False
+
+        # Check for specific heading elements that might indicate error
+        heading_text_script = """
+            Array.from(document.querySelectorAll('h1, h2, h3, .error-title, .error-heading, .not-found, .title'))
+                .map(el => el.innerText || el.textContent)
+                .filter(Boolean)
+                .join(' ');
+        """
+        heading_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": heading_text_script})
+        heading_text = heading_result.get("result", "").toLowerCase()
+
+        error_headings = [
+            "job not found", "page not found", "not found", "error",
+            "sorry", "no longer available", "unavailable",
+            "404", "expired", "closed", "removed", "does not exist"
+        ]
+
+        if any(heading in heading_text for heading in error_headings):
+            logging.info(f"✖ Job page heading indicates job not available: {url}")
+            return False
+
+        # Take screenshot for debugging purposes even for valid pages
+        try:
+            await mcp_puppeteer_puppeteer_screenshot.async_api({"name": f"job_verify_{abs(hash(url)) % 1000}"})
+        except Exception as e:
+            logging.warning(f"Failed to take screenshot: {e}")
+
+        # Check if page contains an apply button or application form
+        apply_button_script = """
+            (function() {
+                const applyTexts = ['apply', 'application', 'submit', 'apply now', 'apply for this job'];
+
+                // Check for buttons or links with apply text
+                const elements = Array.from(document.querySelectorAll('a, button, input[type="submit"], .apply, [role="button"]'));
+
+                for (const el of elements) {
+                    const text = (el.innerText || el.textContent || el.value || '').toLowerCase();
+                    if (applyTexts.some(applyText => text.includes(applyText))) {
+                        return true;
+                    }
+
+                    // Check for aria labels and other accessible attributes
+                    const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                    if (applyTexts.some(applyText => ariaLabel.includes(applyText))) {
+                        return true;
+                    }
+
+                    // Check for apply in the href for links
+                    const href = (el.getAttribute('href') || '').toLowerCase();
+                    if (href.includes('apply') || href.includes('job-application')) {
+                        return true;
+                    }
+                }
+
+                // Check for forms that might be application forms
+                const forms = document.querySelectorAll('form');
+                for (const form of forms) {
+                    const formId = (form.id || '').toLowerCase();
+                    const formClass = (form.className || '').toLowerCase();
+                    const formAction = (form.action || '').toLowerCase();
+
+                    if (
+                        formId.includes('apply') || formId.includes('application') ||
+                        formClass.includes('apply') || formClass.includes('application') ||
+                        formAction.includes('apply') || formAction.includes('application')
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })();
+        """
+
+        apply_button_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": apply_button_script})
+        has_apply_button = apply_button_result.get("result", False)
+
+        if has_apply_button:
+            logging.info(f"✓ Apply button found: {url}")
+            return True
+        else:
+            logging.info(f"✖ No apply button found: {url}")
+            return False
+
     except Exception as e:
-        logging.warning(f"✖ Browser verification failed: {str(e)}")
-        # Be more cautious - don't assume valid
-        logging.info(f"✖ Cannot verify job URL: {url}")
+        logging.error(f"Error verifying job URL with browser: {e}")
+        logging.error(traceback.format_exc())
+        # If we can't verify with browser but URL passed pattern checks, be cautious and reject
+        logging.warning(f"Rejecting URL due to verification error: {url}")
         return False
 
 @function_tool
@@ -1077,6 +840,9 @@ async def gather_jobs_with_multi_agents(cfg, logger) -> List[Dict[str, Any]]:
     logger.info(f"Targeting {majors_quota} major company jobs and {startups_quota} startup jobs")
     logger.info(f"Web URL verification: {'Enabled' if use_web_verification else 'Basic validation only'}")
     logger.info(f"Using model: {model}")
+
+    # Initialize token tracking
+    token_usage = {}
 
     # Initialize agents
     logger.info("Initializing agents...")
@@ -1380,20 +1146,25 @@ async def gather_jobs_with_multi_agents(cfg, logger) -> List[Dict[str, Any]]:
 
     # Generate token usage report
     try:
-        total_tokens = sum(agent_usage.tokens_per_model.values())
+        # Check if the expected attribute exists in agent_usage
+        if hasattr(agent_usage, 'tokens_per_model'):
+            total_tokens = sum(agent_usage.tokens_per_model.values())
 
-        # Calculate cost using our token monitor rates
-        token_monitor = TokenMonitor(cfg, logger)
-        total_cost = sum(
-            (tokens / 1000) * token_monitor.get_model_rate(model_name)
-            for model_name, tokens in agent_usage.tokens_per_model.items()
-        )
+            # Calculate cost using our token monitor rates
+            token_monitor = TokenMonitor(cfg, logger)
+            total_cost = sum(
+                (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                for model_name, tokens in agent_usage.tokens_per_model.items()
+            )
 
-        logger.info("\nToken usage statistics:")
-        for model_name, tokens in agent_usage.tokens_per_model.items():
-            model_cost = (tokens / 1000) * token_monitor.get_model_rate(model_name)
-            logger.info(f"  - {model_name}: {tokens:,} tokens (${model_cost:.4f})")
-        logger.info(f"Total: {total_tokens:,} tokens (${total_cost:.4f})")
+            logger.info("\nToken usage statistics:")
+            for model_name, tokens in agent_usage.tokens_per_model.items():
+                model_cost = (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                logger.info(f"  - {model_name}: {tokens:,} tokens (${model_cost:.4f})")
+            logger.info(f"Total: {total_tokens:,} tokens (${total_cost:.4f})")
+        else:
+            # Fallback when tokens_per_model isn't available
+            logger.info("Token usage tracking is not available in this version of the agents library")
     except Exception as e:
         logger.warning(f"Could not generate token usage report: {e}")
 
@@ -1679,19 +1450,24 @@ def main():
 
             # Print token usage statistics
             try:
-                total_tokens = sum(agent_usage.tokens_per_model.values())
-                # Calculate cost using token monitor rates
-                total_cost = sum(
-                    (tokens / 1000) * token_monitor.get_model_rate(model_name)
-                    for model_name, tokens in agent_usage.tokens_per_model.items()
-                )
-                print(f"\nToken usage: {total_tokens:,}")
-                print(f"Estimated cost: ${total_cost:.4f}")
+                # Check if tokens_per_model attribute exists
+                if hasattr(agent_usage, 'tokens_per_model'):
+                    total_tokens = sum(agent_usage.tokens_per_model.values())
+                    # Calculate cost using token monitor rates
+                    total_cost = sum(
+                        (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                        for model_name, tokens in agent_usage.tokens_per_model.items()
+                    )
+                    print(f"\nToken usage: {total_tokens:,}")
+                    print(f"Estimated cost: ${total_cost:.4f}")
 
-                # Check budget if set
-                if config["budget"] is not None and total_cost > config["budget"]:
-                    logger.warning(f"Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
-                    print(f"\nWARNING: Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                    # Check budget if set
+                    if config["budget"] is not None and total_cost > config["budget"]:
+                        logger.warning(f"Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                        print(f"\nWARNING: Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                else:
+                    # Just log a message if token tracking isn't available
+                    print("\nToken usage information not available")
             except Exception as e:
                 logger.warning(f"Could not generate token usage report: {e}")
 
