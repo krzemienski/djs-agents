@@ -15,8 +15,13 @@ COMPANY_LIST=""
 WEB_VERIFY="--web-verify" # Enable web verification by default
 DEBUG=""
 OUTPUT="results/jobs.csv"
-# Simplified mode removed
+MAX_TOKENS=""
+COMPANY_LIST_LIMIT=""
+LOG_LEVEL=""
+LOG_FILE=""
 DRY_RUN=""
+VISUALIZE="--visualize" # Enable visualization by default
+TRACE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -37,8 +42,24 @@ while [[ $# -gt 0 ]]; do
       COMPANY_LIST="--company-list $2"
       shift 2
       ;;
+    --company-list-limit)
+      COMPANY_LIST_LIMIT="--company-list-limit $2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="--max-tokens $2"
+      shift 2
+      ;;
     --no-web-verify)
       WEB_VERIFY=""
+      shift
+      ;;
+    --web-verify)
+      WEB_VERIFY="--web-verify"
+      shift
+      ;;
+    --use-web-verify)
+      WEB_VERIFY="--web-verify"
       shift
       ;;
     --debug)
@@ -49,17 +70,45 @@ while [[ $# -gt 0 ]]; do
       OUTPUT="$2"
       shift 2
       ;;
-# Simplified mode has been removed
-# Run full multi-agent search only
     --dry-run)
       DRY_RUN="--dry-run"
       shift
       ;;
-    # --use-real-urls flag removed
-# Always use real URLs by default
+    --log-level)
+      LOG_LEVEL="--log-level $2"
+      shift 2
+      ;;
+    --log-file)
+      LOG_FILE="--log-file $2"
+      shift 2
+      ;;
+    --visualize)
+      VISUALIZE="--visualize"
+      shift
+      ;;
+    --no-visualize)
+      VISUALIZE=""
+      shift
+      ;;
+    --trace)
+      TRACE="--trace"
+      shift
+      ;;
+    --budget|--force)
+      # These arguments aren't supported by deep_job_search.py but are mentioned in README
+      # Just skip them for now
+      shift
+      if [[ "$1" != --* && "$1" != -* && "$1" != "" ]]; then
+        # If the next argument isn't a flag, it's the value for this parameter
+        shift
+      fi
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [-m|--majors COUNT] [-s|--startups COUNT] [--model MODEL] [--company-list FILE] [--no-web-verify] [--debug] [--output FILE] [--dry-run]"
+      echo "Usage: $0 [-m|--majors COUNT] [-s|--startups COUNT] [--model MODEL] [--max-tokens COUNT]"
+      echo "         [--company-list FILE] [--company-list-limit COUNT] [--web-verify|--no-web-verify]"
+      echo "         [--debug] [--log-level LEVEL] [--log-file FILE] [--output FILE] [--dry-run]"
+      echo "         [--visualize|--no-visualize] [--trace]"
       exit 1
       ;;
   esac
@@ -84,10 +133,15 @@ python deep_job_search.py \
   --startups $STARTUP_COUNT \
   --model $MODEL \
   $COMPANY_LIST \
+  $COMPANY_LIST_LIMIT \
+  $MAX_TOKENS \
   $WEB_VERIFY \
   $DEBUG \
-  \
+  $LOG_LEVEL \
+  $LOG_FILE \
   $DRY_RUN \
+  $VISUALIZE \
+  $TRACE \
   --output $OUTPUT
 
 # Check exit code

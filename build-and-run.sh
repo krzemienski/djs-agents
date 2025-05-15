@@ -14,6 +14,14 @@ echo "=== Deep Job Search - Build & Run ==="
 
 # Check if we need to rebuild the container
 REBUILD=false
+
+# Process any rebuild flag first
+if [[ " $* " == *" --rebuild "* ]]; then
+  echo "Rebuild flag detected (--rebuild), will rebuild container"
+  REBUILD=true
+fi
+
+# Also check for .rebuild-marker file
 if [ -f .rebuild-marker ]; then
   echo "Rebuild marker found (.rebuild-marker), will rebuild container"
   REBUILD=true
@@ -32,6 +40,18 @@ if [ "$(find requirements*.txt -newer logs/debug/.last_build 2>/dev/null)" ]; th
   REBUILD=true
 fi
 
+# Also check if Python files have been modified
+if [ "$(find *.py -newer logs/debug/.last_build 2>/dev/null)" ]; then
+  echo "Python files have been modified, will rebuild container"
+  REBUILD=true
+fi
+
+# Also check if shell scripts have been modified
+if [ "$(find *.sh -newer logs/debug/.last_build 2>/dev/null)" ]; then
+  echo "Shell scripts have been modified, will rebuild container"
+  REBUILD=true
+fi
+
 # Ensure we have a Docker image
 if ! docker image inspect djso 2>/dev/null >/dev/null; then
   echo "Docker image 'djso' not found, will build it"
@@ -45,13 +65,21 @@ if [ "$REBUILD" = true ]; then
   touch logs/debug/.last_build
 fi
 
+# Filter out the --rebuild flag from args
+FILTERED_ARGS=()
+for arg in "$@"; do
+  if [ "$arg" != "--rebuild" ]; then
+    FILTERED_ARGS+=("$arg")
+  fi
+done
+
 # Check if output arg is already specified
 HAS_OUTPUT=false
 # Check if simplified flag is present
 HAS_SIMPLIFIED=false
 # Check if dry-run flag is present
 IS_DRY_RUN=false
-for arg in "$@"; do
+for arg in "${FILTERED_ARGS[@]}"; do
   if [[ "$arg" == "--output" ]]; then
     HAS_OUTPUT=true
   fi
@@ -64,7 +92,7 @@ for arg in "$@"; do
 done
 
 # Build the argument array for run.sh
-ARGS=("$@")
+ARGS=("${FILTERED_ARGS[@]}")
 
 # Add output argument if needed
 if [ "$HAS_OUTPUT" = false ]; then
