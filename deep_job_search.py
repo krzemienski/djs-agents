@@ -261,46 +261,65 @@ async def validate_job_url(url: str) -> bool:
         # Check for suspicious patterns
         suspicious_patterns = [
             "example.com", "test", "dummy", "placeholder",
-            "example", "localhost", "127.0.0.1", "test.com",
-            "{company}", "{role}", "{id}", "{keyword}"
+            "127.0.0.1", "localhost", "template", "demo"
+        ]
+        if any(pattern in url.lower() for pattern in suspicious_patterns):
+            logging.info(f"✖ Suspicious URL pattern detected: {url}")
+            return False
+
+        # Block known troublesome job listing URLs
+        blocked_patterns = [
+            # Major company job boards that often 404 or have false positives
+            "google.com/about/careers/applications/jobs/results/",
+            "jobs.apple.com/en-us/details/",
+            "amazon.jobs/en/jobs/",
+            "careers.microsoft.com/us/en/job/",
+            "netflix.com/jobs/jobs/",
+            "meta.com/careers/jobs/",
+
+            # Common patterns in URLs that point to expired listings
+            "expired", "closed", "filled", "not-found", "404",
+            "removed", "archived", "old-job", "past-jobs"
         ]
 
-        # Skip example URLs and suspicious patterns
-        url_lower = url.lower()
+        if any(pattern in url.lower() for pattern in blocked_patterns):
+            logging.info(f"✖ Known problematic job URL pattern detected: {url}")
+            return False
 
-        # Reject obviously fake/example URLs
-        for pattern in suspicious_patterns:
-            if pattern in url_lower:
-                logging.info(f"✖ Suspicious URL pattern detected '{pattern}' in: {url}")
+        # Allowlist common job boards that tend to be more reliable
+        allowlisted_domains = [
+            "lever.co", "greenhouse.io", "jobs.ashbyhq.com",
+            "workable.com", "jobvite.com", "boards.greenhouse.io",
+            "job-boards.greenhouse.io", "wellfound.com", "angel.co",
+            "ycombinator.com", "techstars.com"
+        ]
+
+        # If not in allowlist, check if domain looks job-related
+        if not any(domain in parsed_url.netloc.lower() for domain in allowlisted_domains):
+            # Check if the domain or path at least contains job-related terms
+            job_terms = [
+                "job", "career", "work", "employ", "position", "hire",
+                "apply", "applications", "opening", "vacancy"
+            ]
+
+            domain_path = f"{parsed_url.netloc}{parsed_url.path}".lower()
+            if not any(term in domain_path for term in job_terms):
+                logging.info(f"✖ URL doesn't appear to be job-related: {url}")
                 return False
 
-        # Also reject URLs with no valid domain
-        if not any(tld in url_lower for tld in [".com", ".org", ".io", ".net", ".gov", ".edu", ".co", ".jobs"]):
-            logging.info(f"✖ No valid TLD found in URL: {url}")
+        # First try using a browser to verify
+        browser_result = await verify_with_browser(url)
+        if browser_result:
+            return True
+        else:
+            # Browser verification failed,
+            # be strict and reject rather than assume it's valid
+            logging.info(f"✖ URL failed browser verification: {url}")
             return False
-
-        # First, do basic URL pattern validation
-        job_domains = [
-            "linkedin.com/jobs", "indeed.com/job", "glassdoor.com/job",
-            "lever.co", "greenhouse.io", "workday.com", "smartrecruiters.com",
-            "jobs.", "careers.", "apply.", "/job/", "/jobs/"
-        ]
-
-        domain_valid = any(pattern in url_lower for pattern in job_domains)
-
-        if not domain_valid:
-            logging.info(f"✖ No job board patterns found: {url}")
-            return False
-
-        # Basic validation passed, now try MCP Browser validation if available
-        logging.info(f"🔍 Validating job URL: {url}")
-
-        # We need to handle this differently than trying to import modules
-        # Since we're using function tools, we'll do a direct call with a function
-        return await verify_with_browser(url)
 
     except Exception as e:
-        logging.error(f"✖ URL validation error: {str(e)}")
+        logging.error(f"Error validating job URL: {e}")
+        logging.error(traceback.format_exc())
         return False
 
 async def verify_with_browser(url: str) -> bool:
@@ -324,98 +343,212 @@ async def verify_with_browser(url: str) -> bool:
             import mcp_puppeteer_puppeteer_evaluate
             import mcp_puppeteer_puppeteer_screenshot
             browser_available = True
-        except ImportError:
-            logging.info(f"✓ Apply button found (browser not available): {url}")
+        except ImportError as e:
+            logging.warning(f"Browser verification tools not available: {e}")
+
+            # More strict pattern matching fallback
+            suspicious_domains = [
+                "example.com", "test.com", "demo", "localhost", "127.0.0.1",
+                "staging", "dev.", "development", ".local"
+            ]
+            if any(domain in url.lower() for domain in suspicious_domains):
+                logging.info(f"✖ Suspicious URL domain detected in fallback check: {url}")
+                return False
+
+            # Special checks for common job boards that we know have issues
+
+            # Google Career URLs - These frequently 404
+            if "google.com/about/careers/applications/jobs/results/" in url.lower():
+                logging.info(f"✖ Google Careers URL rejected (commonly 404): {url}")
+                return False
+
+            # Apple job URLs - These frequently 404
+            if "jobs.apple.com/en-us/details/" in url.lower():
+                logging.info(f"✖ Apple Jobs URL rejected (commonly 404): {url}")
+                return False
+
+            # Amazon Jobs - These frequently 404
+            if "amazon.jobs/en/jobs/" in url.lower():
+                logging.info(f"✖ Amazon Jobs URL rejected (commonly 404): {url}")
+                return False
+
+            # Other major job boards with ID-based URLs that may be inactive
+            # Instead, focus on job boards with more reliable URLs
+
+            # If we have to fall back, be more restrictive about what URLs we accept
+            # Pattern matching for common job boards to reduce false positives
+            trusted_domains = [
+                "lever.co", "greenhouse.io", "jobs.ashbyhq.com",
+                "workable.com", "jobvite.com", "linkedin.com/jobs",
+                "wellfound.com", "angel.co/jobs", "indeed.com",
+                "glassdoor.com", "remotejobs", "wellfound.com",
+                "ycombinator.com", "y-combinator", "techstars.com",
+                "stackoverflow.com/jobs", "remoteok.io",
+                "boards.greenhouse.io", "job-boards.greenhouse.io"
+            ]
+
+            if not any(domain in url.lower() for domain in trusted_domains):
+                # For non-job board domains, be more cautious
+                job_path_patterns = [
+                    "job", "career", "position", "vacancy", "employment", "hiring",
+                    "job-application", "job-posting", "job-details", "job-description"
+                ]
+                if not any(pattern in url.lower() for pattern in job_path_patterns):
+                    logging.info(f"✖ URL doesn't contain job path patterns in fallback check: {url}")
+                    return False
+
+            logging.warning(f"Falling back to pattern matching for URL: {url}")
             return True
 
-        if browser_available:
+        if not browser_available:
+            logging.warning("Browser verification failed - no browser tools available")
+            return False
+
+        # Navigate to the job URL
+        navigate_result = await mcp_puppeteer_puppeteer_navigate.async_api({"url": url})
+        logging.debug(f"Navigate result: {navigate_result}")
+
+        # Get the final URL after any redirects
+        current_url_script = "window.location.href"
+        current_url_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": current_url_script})
+        final_url = current_url_result.get("result", url)
+
+        if url != final_url:
+            logging.warning(f"URL redirected from {url} to {final_url}")
+            # Check if redirected to a homepage or generic listing
+            redirect_patterns = [
+                "/jobs", "/careers", "/work", "/home", "linkedin.com",
+                "indeed.com", "glassdoor.com", "404", "not-found", "error"
+            ]
+            if any(pattern in final_url.lower() for pattern in redirect_patterns):
+                logging.info(f"✖ Invalid redirect detected: {final_url}")
+                return False
+
+        # Check if page has job not found messages or error indicators
+        # First check for common error text patterns
+        page_text_script = """
+            document.body.innerText ||
+            (document.body.textContent ? document.body.textContent.trim() : '')
+        """
+        page_text_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": page_text_script})
+        page_text = page_text_result.get("result", "").lower()
+
+        # Common error message patterns across job sites
+        error_patterns = [
+            "job not found", "not found", "no longer available",
+            "position has been filled", "isn't available", "isn't active",
+            "job you're looking for isn't available", "taken down",
+            "has been closed", "has expired", "has been removed",
+            "not accepting applications", "is closed", "sorry",
+            "404", "page not found", "could not be found", "job deleted",
+            "we couldn't find that job", "this job may have been taken down",
+            "this job is no longer active", "something went wrong",
+            "job has been filled", "position is no longer open",
+            "does not exist", "jobs below", "check them out by searching",
+            "we couldn't find the page you were looking for",
+            "we can't find the page you're looking for",
+            "role does not exist", "no longer available", "this role does not exist",
+            "page not found", "search current openings"
+        ]
+
+        if any(pattern in page_text for pattern in error_patterns):
+            logging.info(f"✖ Job page indicates job not available: {url}")
+            # Take a screenshot for debugging
             try:
-                # Navigate to the URL
-                await mcp_puppeteer_puppeteer_navigate.mcp_puppeteer_puppeteer_navigate({"url": url})
+                await mcp_puppeteer_puppeteer_screenshot.async_api({"name": "job_not_found"})
+            except Exception as e:
+                logging.warning(f"Failed to take screenshot: {e}")
+            return False
 
-                # Take a screenshot for verification
-                screenshot_name = f"job_verify_{url.replace('://', '_').replace('.', '_').replace('/', '_')[:30]}"
-                try:
-                    # Save to logs/visuals directory for better organization
-                    screenshot_dir = Path("logs/visuals")
-                    screenshot_dir.mkdir(exist_ok=True, parents=True)
+        # Check for specific heading elements that might indicate error
+        heading_text_script = """
+            Array.from(document.querySelectorAll('h1, h2, h3, .error-title, .error-heading, .not-found, .title'))
+                .map(el => el.innerText || el.textContent)
+                .filter(Boolean)
+                .join(' ');
+        """
+        heading_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": heading_text_script})
+        heading_text = heading_result.get("result", "").toLowerCase()
 
-                    # Add .png extension and timestamp to avoid overwrites
-                    screenshot_name = f"{screenshot_name}_{int(time.time())}.png"
+        error_headings = [
+            "job not found", "page not found", "not found", "error",
+            "sorry", "no longer available", "unavailable",
+            "404", "expired", "closed", "removed", "does not exist"
+        ]
 
-                    # Take the screenshot
-                    await mcp_puppeteer_puppeteer_screenshot.mcp_puppeteer_puppeteer_screenshot({
-                        "name": screenshot_name,
-                        "width": 1200,
-                        "height": 900
-                    })
+        if any(heading in heading_text for heading in error_headings):
+            logging.info(f"✖ Job page heading indicates job not available: {url}")
+            return False
 
-                    logging.info(f"Screenshot saved as {screenshot_name}")
-                except Exception as e:
-                    logging.warning(f"Screenshot failed: {e}")
+        # Take screenshot for debugging purposes even for valid pages
+        try:
+            await mcp_puppeteer_puppeteer_screenshot.async_api({"name": f"job_verify_{abs(hash(url)) % 1000}"})
+        except Exception as e:
+            logging.warning(f"Failed to take screenshot: {e}")
 
-                # Check for Apply button or text
-                script = """
-                () => {
-                    // Look for common apply button text
-                    const textPatterns = ['apply', 'submit', 'send application', 'apply now', 'apply for this job'];
+        # Check if page contains an apply button or application form
+        apply_button_script = """
+            (function() {
+                const applyTexts = ['apply', 'application', 'submit', 'apply now', 'apply for this job'];
 
-                    // Look for common apply button elements
-                    const buttonSelectors = [
-                        'button[type="submit"]',
-                        'input[type="submit"]',
-                        'a[href*="apply"]',
-                        'button:contains("Apply")',
-                        'a:contains("Apply")',
-                        '[aria-label*="apply" i]',
-                        '[id*="apply" i]',
-                        '[class*="apply" i]'
-                    ];
+                // Check for buttons or links with apply text
+                const elements = Array.from(document.querySelectorAll('a, button, input[type="submit"], .apply, [role="button"]'));
 
-                    // Check for text patterns in the page content
-                    const pageText = document.body.innerText.toLowerCase();
-                    const hasApplyText = textPatterns.some(pattern => pageText.includes(pattern));
-
-                    // Check for apply button elements
-                    let hasApplyButton = false;
-                    for (const selector of buttonSelectors) {
-                        try {
-                            const elements = document.querySelectorAll(selector);
-                            if (elements && elements.length > 0) {
-                                hasApplyButton = true;
-                                break;
-                            }
-                        } catch (e) {
-                            // Ignore invalid selectors
-                        }
+                for (const el of elements) {
+                    const text = (el.innerText || el.textContent || el.value || '').toLowerCase();
+                    if (applyTexts.some(applyText => text.includes(applyText))) {
+                        return true;
                     }
 
-                    return {
-                        hasApplyText: hasApplyText,
-                        hasApplyButton: hasApplyButton,
-                        title: document.title
-                    };
+                    // Check for aria labels and other accessible attributes
+                    const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                    if (applyTexts.some(applyText => ariaLabel.includes(applyText))) {
+                        return true;
+                    }
+
+                    // Check for apply in the href for links
+                    const href = (el.getAttribute('href') || '').toLowerCase();
+                    if (href.includes('apply') || href.includes('job-application')) {
+                        return true;
+                    }
                 }
-                """
 
-                result = await mcp_puppeteer_puppeteer_evaluate.mcp_puppeteer_puppeteer_evaluate({"script": script})
+                // Check for forms that might be application forms
+                const forms = document.querySelectorAll('form');
+                for (const form of forms) {
+                    const formId = (form.id || '').toLowerCase();
+                    const formClass = (form.className || '').toLowerCase();
+                    const formAction = (form.action || '').toLowerCase();
 
-                if result.get('hasApplyButton') or result.get('hasApplyText'):
-                    logging.info(f"✓ Apply button found: {url} - {result.get('title', '')}")
-                    return True
-                else:
-                    logging.info(f"✖ No Apply button found: {url}")
-                    return False
-            except Exception as e:
-                logging.warning(f"✖ Browser verification failed: {str(e)}")
-                logging.info(f"✓ Apply button found (pattern match fallback): {url}")
-                return True
+                    if (
+                        formId.includes('apply') || formId.includes('application') ||
+                        formClass.includes('apply') || formClass.includes('application') ||
+                        formAction.includes('apply') || formAction.includes('application')
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })();
+        """
+
+        apply_button_result = await mcp_puppeteer_puppeteer_evaluate.async_api({"script": apply_button_script})
+        has_apply_button = apply_button_result.get("result", False)
+
+        if has_apply_button:
+            logging.info(f"✓ Apply button found: {url}")
+            return True
+        else:
+            logging.info(f"✖ No apply button found: {url}")
+            return False
+
     except Exception as e:
-        logging.warning(f"✖ Browser verification failed: {str(e)}")
-
-        # Fall back to pattern-based validation
-        logging.info(f"✓ Apply button found (pattern match fallback): {url}")
-        return True  # Pattern validation already passed, so return True
+        logging.error(f"Error verifying job URL with browser: {e}")
+        logging.error(traceback.format_exc())
+        # If we can't verify with browser but URL passed pattern checks, be cautious and reject
+        logging.warning(f"Rejecting URL due to verification error: {url}")
+        return False
 
 @function_tool
 async def extract_job_listings(query: str) -> str:
@@ -707,6 +840,9 @@ async def gather_jobs_with_multi_agents(cfg, logger) -> List[Dict[str, Any]]:
     logger.info(f"Targeting {majors_quota} major company jobs and {startups_quota} startup jobs")
     logger.info(f"Web URL verification: {'Enabled' if use_web_verification else 'Basic validation only'}")
     logger.info(f"Using model: {model}")
+
+    # Initialize token tracking
+    token_usage = {}
 
     # Initialize agents
     logger.info("Initializing agents...")
@@ -1010,20 +1146,25 @@ async def gather_jobs_with_multi_agents(cfg, logger) -> List[Dict[str, Any]]:
 
     # Generate token usage report
     try:
-        total_tokens = sum(agent_usage.tokens_per_model.values())
+        # Check if the expected attribute exists in agent_usage
+        if hasattr(agent_usage, 'tokens_per_model'):
+            total_tokens = sum(agent_usage.tokens_per_model.values())
 
-        # Calculate cost using our token monitor rates
-        token_monitor = TokenMonitor(cfg, logger)
-        total_cost = sum(
-            (tokens / 1000) * token_monitor.get_model_rate(model_name)
-            for model_name, tokens in agent_usage.tokens_per_model.items()
-        )
+            # Calculate cost using our token monitor rates
+            token_monitor = TokenMonitor(cfg, logger)
+            total_cost = sum(
+                (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                for model_name, tokens in agent_usage.tokens_per_model.items()
+            )
 
-        logger.info("\nToken usage statistics:")
-        for model_name, tokens in agent_usage.tokens_per_model.items():
-            model_cost = (tokens / 1000) * token_monitor.get_model_rate(model_name)
-            logger.info(f"  - {model_name}: {tokens:,} tokens (${model_cost:.4f})")
-        logger.info(f"Total: {total_tokens:,} tokens (${total_cost:.4f})")
+            logger.info("\nToken usage statistics:")
+            for model_name, tokens in agent_usage.tokens_per_model.items():
+                model_cost = (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                logger.info(f"  - {model_name}: {tokens:,} tokens (${model_cost:.4f})")
+            logger.info(f"Total: {total_tokens:,} tokens (${total_cost:.4f})")
+        else:
+            # Fallback when tokens_per_model isn't available
+            logger.info("Token usage tracking is not available in this version of the agents library")
     except Exception as e:
         logger.warning(f"Could not generate token usage report: {e}")
 
@@ -1309,19 +1450,24 @@ def main():
 
             # Print token usage statistics
             try:
-                total_tokens = sum(agent_usage.tokens_per_model.values())
-                # Calculate cost using token monitor rates
-                total_cost = sum(
-                    (tokens / 1000) * token_monitor.get_model_rate(model_name)
-                    for model_name, tokens in agent_usage.tokens_per_model.items()
-                )
-                print(f"\nToken usage: {total_tokens:,}")
-                print(f"Estimated cost: ${total_cost:.4f}")
+                # Check if tokens_per_model attribute exists
+                if hasattr(agent_usage, 'tokens_per_model'):
+                    total_tokens = sum(agent_usage.tokens_per_model.values())
+                    # Calculate cost using token monitor rates
+                    total_cost = sum(
+                        (tokens / 1000) * token_monitor.get_model_rate(model_name)
+                        for model_name, tokens in agent_usage.tokens_per_model.items()
+                    )
+                    print(f"\nToken usage: {total_tokens:,}")
+                    print(f"Estimated cost: ${total_cost:.4f}")
 
-                # Check budget if set
-                if config["budget"] is not None and total_cost > config["budget"]:
-                    logger.warning(f"Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
-                    print(f"\nWARNING: Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                    # Check budget if set
+                    if config["budget"] is not None and total_cost > config["budget"]:
+                        logger.warning(f"Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                        print(f"\nWARNING: Budget exceeded: ${total_cost:.4f} > ${config['budget']:.2f}")
+                else:
+                    # Just log a message if token tracking isn't available
+                    print("\nToken usage information not available")
             except Exception as e:
                 logger.warning(f"Could not generate token usage report: {e}")
 
